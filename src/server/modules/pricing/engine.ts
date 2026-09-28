@@ -18,7 +18,7 @@ import {
   type Size,
   type StepEstimate,
   numberConfigSchema,
-  OPERATION_BASES,
+  type OPERATION_BASES,
 } from "./types";
 
 export const ENGINE_VERSION = 1;

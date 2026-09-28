@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { Boxes, Loader2, Package, Receipt, Search, UserRound, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { useDebouncedFetch } from "@/lib/use-debounced-fetch";
 import { toFaDigits } from "@/lib/persian";
 
 interface Hit { kind: "order" | "customer" | "product" | "employee" | "material"; id: string; title: string; subtitle: string; href: string }
@@ -15,31 +16,12 @@ const KIND = { order: "سفارش", customer: "مشتری", product: "محصول
 export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const router = useRouter();
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<Hit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    const ctrl = new AbortController();
-    setLoading(true);
-    const t = setTimeout(() => {
-      api<Hit[]>(`search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
-        .then((h) => {
-          setHits(h);
-          setActive(0);
-        })
-        .catch(() => undefined)
-        .finally(() => setLoading(false));
-    }, 180);
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
-  }, [q]);
+  const [activeRaw, setActive] = useState(0);
+  const term = q.trim().length >= 2 ? q.trim() : null;
+  const search = useDebouncedFetch<Hit[]>(term, (signal) => api<Hit[]>(`search?q=${encodeURIComponent(term ?? "")}`, { signal }), 180);
+  const hits = term ? (search.data ?? []) : [];
+  const loading = search.loading;
+  const active = Math.min(activeRaw, Math.max(0, hits.length - 1));
 
   const go = (h: Hit) => {
     onOpenChange(false);
@@ -59,7 +41,7 @@ export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenCha
             <input
               autoFocus
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => { setQ(e.target.value); setActive(0); }}
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown") setActive((a) => Math.min(hits.length - 1, a + 1));
                 if (e.key === "ArrowUp") setActive((a) => Math.max(0, a - 1));

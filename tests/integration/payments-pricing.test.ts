@@ -144,8 +144,8 @@ describe("pricing versions and snapshots", () => {
     await expect(updateDraft(mgr, live.id, live.data)).rejects.toThrow(/پیش‌نویس/); // published versions are immutable
     const draft = await createDraft(mgr, live.id, "افزایش نرخ");
     const data = structuredClone(draft.data) as PricingRules;
-    data.methods.OFFSET!.kind === "OFFSET" && (data.methods.OFFSET!.runCostPer1000PerColor *= 2);
-    data.methods.DIGITAL!.kind === "DIGITAL" && (data.methods.DIGITAL!.clickCostColor *= 2);
+    if (data.methods.OFFSET!.kind === "OFFSET") data.methods.OFFSET!.runCostPer1000PerColor *= 2;
+    if (data.methods.DIGITAL!.kind === "DIGITAL") data.methods.DIGITAL!.clickCostColor *= 2;
     await updateDraft(mgr, draft.id, data);
     await expect(publishDraft(sales, draft.id)).rejects.toThrow(/مجوز/);
     await publishDraft(mgr, draft.id);

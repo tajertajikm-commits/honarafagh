@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const SHOTS = process.env.E2E_SHOTS;
-const shot = async (page: import("@playwright/test").Page, name: string) => {
+const shot = async (page: Page, name: string) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 };
 
-async function loginCustomer(page: import("@playwright/test").Page, phone: string, next = "/account") {
+async function loginCustomer(page: Page, phone: string, next = "/account") {
   await page.goto(`/login?next=${encodeURIComponent(next)}`);
   await page.getByLabel("شماره موبایل").fill(phone);
   await page.getByRole("button", { name: "دریافت کد تأیید" }).click();

@@ -1,7 +1,7 @@
 "use client";
 
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 
 type Theme = "light" | "dark" | "system";
@@ -15,23 +15,34 @@ function apply(t: Theme) {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 }
 
+const EVENT = "ha-theme-change";
+function readTheme(): Theme {
+  try {
+    return (localStorage.getItem(KEY) as Theme) || "light";
+  } catch {
+    return "light";
+  }
+}
+function subscribe(cb: () => void) {
+  window.addEventListener("storage", cb);
+  window.addEventListener(EVENT, cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener(EVENT, cb);
+  };
+}
+
 export function ThemeSwitch({ className }: { className?: string }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  useEffect(() => {
-    try {
-      setTheme((localStorage.getItem(KEY) as Theme) || "light");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  // The stored preference is external state; the server renders the default.
+  const theme = useSyncExternalStore(subscribe, readTheme, () => "light" as Theme);
   const choose = (t: Theme) => {
-    setTheme(t);
     try {
       localStorage.setItem(KEY, t);
     } catch {
       /* ignore */
     }
     apply(t);
+    window.dispatchEvent(new Event(EVENT));
   };
   const opts: { t: Theme; icon: typeof Sun; label: string }[] = [
     { t: "light", icon: Sun, label: "روشن" },

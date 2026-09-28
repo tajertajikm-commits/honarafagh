@@ -57,6 +57,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
               {version.notes && <span className="text-[13px] text-muted">— {version.notes}</span>}
             </div>
             <PricingAdmin
+              key={version.id}
               version={{ id: version.id, ruleSetId: version.ruleSetId, version: version.version, status: version.status, notes: version.notes, data: version.data as never }}
               publishedId={publishedId}
               perms={[...ctx.actor.permissions]}

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarClock, Check, Minus, Plus, ShoppingBag } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { FileDrop, type UploadedFile } from "@/components/ui/file-drop";
 import { Money, Skeleton } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { useDebouncedFetch } from "@/lib/use-debounced-fetch";
 import { METHOD } from "@/lib/labels";
 import { formatNumber, toEnDigits, toFaDigits } from "@/lib/persian";
 
@@ -80,11 +81,7 @@ export function Configurator({ product, loggedIn }: { product: ConfiguratorProdu
   const [selections, setSelections] = useState(() => initialSelections(product.groups));
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]["key"]>("STANDARD");
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [price, setPrice] = useState<Price | null>(null);
-  const [priceError, setPriceError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [adding, startAdding] = useTransition();
-  const reqId = useRef(0);
 
   const customTrimActive = useMemo(
     () => product.groups.some((g) => g.type === "SELECT" && g.values.some((v) => v.customTrim && selections[g.key] === v.key)),
@@ -93,28 +90,12 @@ export function Configurator({ product, loggedIn }: { product: ConfiguratorProdu
   const visibleGroups = product.groups.filter((g) => !(g.type === "NUMBER" && (g.config?.effect === "TRIM_W" || g.config?.effect === "TRIM_H") && !customTrimActive));
   const needsDesign = selections.design === "service";
 
-  // Live price: debounced, latest request wins.
-  useEffect(() => {
-    const id = ++reqId.current;
-    setLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const p = await api<Price>("pricing/quote", { body: { productId: product.id, quantity, selections, urgency } });
-        if (id === reqId.current) {
-          setPrice(p);
-          setPriceError(null);
-        }
-      } catch (e) {
-        if (id === reqId.current) {
-          setPrice(null);
-          setPriceError(e instanceof ApiError ? e.message : "محاسبه قیمت ممکن نشد.");
-        }
-      } finally {
-        if (id === reqId.current) setLoading(false);
-      }
-    }, 220);
-    return () => clearTimeout(t);
-  }, [product.id, quantity, selections, urgency]);
+  // Live price: debounced; a response only counts for the inputs it was computed from.
+  const priceKey = JSON.stringify([product.id, quantity, selections, urgency]);
+  const quote = useDebouncedFetch<Price>(priceKey, () => api<Price>("pricing/quote", { body: { productId: product.id, quantity, selections, urgency } }), 220);
+  const price = quote.error ? null : quote.data;
+  const priceError = quote.error;
+  const loading = quote.loading;
 
   function commitQty(raw: string) {
     const n = Number(toEnDigits(raw).replace(/[^\d]/g, ""));
@@ -334,7 +315,12 @@ function NumberInput({ group, value, onChange }: { group: Group; value: number; 
   const max = c.max ?? 100000;
   const step = c.step ?? 1;
   const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
+  const [shown, setShown] = useState(value);
+  if (shown !== value) {
+    // Parent changed the value (reset / clamp): mirror it into the text box.
+    setShown(value);
+    setText(String(value));
+  }
   const commit = (raw: string) => {
     const n = Number(toEnDigits(raw));
     if (!Number.isFinite(n)) return setText(String(value));

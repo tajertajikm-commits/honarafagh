@@ -24,7 +24,7 @@ const TABS = [
   { key: "ledger", label: "دفتر دریافت و پرداخت" },
 ] as const;
 
-const daysSince = (d: Date | null) => (d ? Math.floor((Date.now() - d.getTime()) / 86_400_000) : 0);
+const daysSince = (d: Date | null, now = new Date()) => (d ? Math.floor((now.getTime() - d.getTime()) / 86_400_000) : 0);
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const sp = await searchParams;

@@ -11,6 +11,7 @@ import { Money } from "@/components/ui/misc";
 import { Spinner } from "@/components/ui/spinner";
 import { api, ApiError, newIdempotencyKey } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { useDebouncedFetch } from "@/lib/use-debounced-fetch";
 import { METHOD } from "@/lib/labels";
 import { formatNumber, formatPercent, formatPhone, toEnDigits } from "@/lib/persian";
 import { useApiAction } from "./actions";
@@ -28,7 +29,7 @@ export interface CustomerPick { id: string; fullName: string; companyName: strin
 
 type Sel = Record<string, string | number | boolean>;
 interface Price { subtotal: number; unitPrice: number; leadDays: number; method: string; customerDiscountPct: number; costTotal?: number; marginPct?: number; warnings: string[] }
-interface Line { uid: string; productId: string; quantity: string; selections: Sel; custom: boolean; title: string; manualPrice: string; workflowCode: string; override: string; price: Price | null; error: string | null; loading: boolean }
+interface Line { uid: string; productId: string; quantity: string; selections: Sel; custom: boolean; title: string; manualPrice: string; workflowCode: string; override: string; price: Price | null; error: string | null; pricedKey: string | null }
 
 const clean = (s: string) => toEnDigits(s).replace(/[^\d]/g, "");
 const toRial = (toman: string) => Number(clean(toman) || 0) * 10;
@@ -76,33 +77,40 @@ export function OrderBuilder({ mode, products, deliveryMethods, workflows, perms
 
   const newLine = (productId?: string | null, quantity?: number | null, selections?: Sel | null): Line => {
     const p = products.find((x) => x.id === productId) ?? null;
-    return { uid: uid(), productId: p?.id ?? "", quantity: String(quantity ?? p?.quantityPresets[0] ?? p?.minQuantity ?? ""), selections: { ...(p ? defaults(p.groups) : {}), ...(selections ?? {}) }, custom: false, title: "", manualPrice: "", workflowCode: workflows[0]?.code ?? "", override: "", price: null, error: null, loading: false };
+    return { uid: uid(), productId: p?.id ?? "", quantity: String(quantity ?? p?.quantityPresets[0] ?? p?.minQuantity ?? ""), selections: { ...(p ? defaults(p.groups) : {}), ...(selections ?? {}) }, custom: false, title: "", manualPrice: "", workflowCode: workflows[0]?.code ?? "", override: "", price: null, error: null, pricedKey: null };
   };
   const [lines, setLines] = useState<Line[]>(() => [initialLine ? { ...newLine(initialLine.productId, initialLine.quantity, initialLine.selections), title: initialLine.title ?? "" } : newLine()]);
   const patch = (id: string, p: Partial<Line>) => setLines((ls) => ls.map((l) => (l.uid === id ? { ...l, ...p } : l)));
 
-  // Live pricing per product line (debounced; latest request per line wins).
-  const reqIds = useRef<Record<string, number>>({});
-  const priceKey = lines.map((l) => `${l.uid}|${l.productId}|${l.quantity}|${JSON.stringify(l.selections)}|${l.custom}`).join(";") + `|${urgency}|${customer?.id ?? ""}`;
+  // Live pricing per product line. Each price remembers the inputs it was
+  // computed for, so "loading" is derived and stale responses are harmless;
+  // any change aborts in-flight requests and re-prices only changed lines.
+  const keyOf = (l: Line) => JSON.stringify([l.productId, l.quantity, l.selections, urgency, customer?.id ?? null]);
+  const needsPrice = (l: Line) => !l.custom && !!l.productId && Number(l.quantity) > 0;
+  const isLoading = (l: Line) => needsPrice(l) && l.pricedKey !== keyOf(l);
+  const priceKey = lines.map((l) => (needsPrice(l) ? keyOf(l) : "-")).join(";");
   useEffect(() => {
+    const ctrl = new AbortController();
     const timers: ReturnType<typeof setTimeout>[] = [];
     for (const l of lines) {
-      if (l.custom || !l.productId || !Number(l.quantity)) continue;
-      const id = (reqIds.current[l.uid] = (reqIds.current[l.uid] ?? 0) + 1);
-      patch(l.uid, { loading: true });
+      const key = keyOf(l);
+      if (!needsPrice(l) || l.pricedKey === key) continue;
       timers.push(
         setTimeout(async () => {
           try {
-            const price = await api<Price>("pricing/staff-quote", { body: { productId: l.productId, quantity: Number(l.quantity), selections: l.selections, urgency, customerId: customer?.id ?? null } });
-            if (reqIds.current[l.uid] === id) patch(l.uid, { price, error: null, loading: false });
+            const price = await api<Price>("pricing/staff-quote", { body: { productId: l.productId, quantity: Number(l.quantity), selections: l.selections, urgency, customerId: customer?.id ?? null }, signal: ctrl.signal });
+            patch(l.uid, { price, error: null, pricedKey: key });
           } catch (e) {
-            if (reqIds.current[l.uid] === id) patch(l.uid, { price: null, error: e instanceof ApiError ? e.message : "محاسبه قیمت ممکن نشد.", loading: false });
+            if (!ctrl.signal.aborted) patch(l.uid, { price: null, error: e instanceof ApiError ? e.message : "محاسبه قیمت ممکن نشد.", pricedKey: key });
           }
         }, 350),
       );
     }
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      timers.forEach(clearTimeout);
+      ctrl.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- priceKey captures every pricing input
   }, [priceKey]);
 
   const lineSubtotal = (l: Line) => (l.custom ? toRial(l.manualPrice) : l.override ? toRial(l.override) : (l.price?.subtotal ?? 0));
@@ -112,7 +120,7 @@ export function OrderBuilder({ mode, products, deliveryMethods, workflows, perms
   const discountRial = toRial(discount);
   const vat = Math.round(((Math.max(0, subtotal - discountRial) + shipping) * 10) / 100);
   const total = Math.max(0, subtotal - discountRial) + shipping + vat;
-  const ready = !!customer && lines.length > 0 && lines.every((l) => (l.custom ? l.title.trim().length >= 2 && toRial(l.manualPrice) > 0 && Number(l.quantity) > 0 && (mode === "quote" || l.workflowCode) : l.productId && Number(l.quantity) > 0 && l.price && !l.error));
+  const ready = !!customer && lines.length > 0 && lines.every((l) => (l.custom ? l.title.trim().length >= 2 && toRial(l.manualPrice) > 0 && Number(l.quantity) > 0 && (mode === "quote" || l.workflowCode) : l.productId && Number(l.quantity) > 0 && l.price && !l.error && !isLoading(l)));
   const needsAddress = mode === "order" && method && method.kind !== "PICKUP";
 
   const submit = async () => {
@@ -165,7 +173,7 @@ export function OrderBuilder({ mode, products, deliveryMethods, workflows, perms
         <CustomerPicker value={customer} onChange={setCustomer} canCreate={perms.includes("customer.manage")} />
 
         {lines.map((l, i) => (
-          <LineEditor key={l.uid} index={i} line={l} products={products} workflows={workflows} mode={mode} canOverride={canOverride} onChange={(p) => patch(l.uid, p)} onRemove={lines.length > 1 ? () => setLines((ls) => ls.filter((x) => x.uid !== l.uid)) : undefined} newDefaults={(pid) => newLine(pid)} />
+          <LineEditor key={l.uid} index={i} line={l} loading={isLoading(l)} products={products} workflows={workflows} mode={mode} canOverride={canOverride} onChange={(p) => patch(l.uid, p)} onRemove={lines.length > 1 ? () => setLines((ls) => ls.filter((x) => x.uid !== l.uid)) : undefined} newDefaults={(pid) => newLine(pid)} />
         ))}
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setLines((ls) => [...ls, newLine()])}><Plus /> قلم محصول</Button>
@@ -218,7 +226,7 @@ export function OrderBuilder({ mode, products, deliveryMethods, workflows, perms
             {lines.map((l, i) => (
               <div key={l.uid} className="flex justify-between gap-2">
                 <span className="truncate text-muted">{i + 1}. {l.custom ? l.title || "قلم سفارشی" : (products.find((p) => p.id === l.productId)?.name ?? "—")}</span>
-                {l.loading ? <Spinner className="size-4" /> : <Money rial={lineSubtotal(l)} />}
+                {isLoading(l) ? <Spinner className="size-4" /> : <Money rial={lineSubtotal(l)} />}
               </div>
             ))}
             {canOverride && (
@@ -248,23 +256,13 @@ export function OrderBuilder({ mode, products, deliveryMethods, workflows, perms
 
 function CustomerPicker({ value, onChange, canCreate }: { value: CustomerPick | null; onChange: (c: CustomerPick | null) => void; canCreate: boolean }) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<CustomerPick[]>([]);
-  const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [nc, setNc] = useState({ phone: "", fullName: "", companyName: "" });
   const { run, pending } = useApiAction();
-  useEffect(() => {
-    if (value || q.trim().length < 2) { setResults([]); return; }
-    const ctrl = new AbortController();
-    setLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const r = await api<{ rows: CustomerPick[] }>(`customers?q=${encodeURIComponent(q)}`, { method: "GET", signal: ctrl.signal });
-        setResults(r.rows);
-      } catch { /* aborted */ } finally { setLoading(false); }
-    }, 250);
-    return () => { clearTimeout(t); ctrl.abort(); };
-  }, [q, value]);
+  const term = !value && q.trim().length >= 2 ? q.trim() : null;
+  const search = useDebouncedFetch<{ rows: CustomerPick[] }>(term, (signal) => api(`customers?q=${encodeURIComponent(term ?? "")}`, { signal }));
+  const results = term ? (search.data?.rows ?? []) : [];
+  const loading = search.loading;
 
   if (value) {
     return (
@@ -320,9 +318,10 @@ function CustomerPicker({ value, onChange, canCreate }: { value: CustomerPick | 
   );
 }
 
-function LineEditor({ index, line: l, products, workflows, mode, canOverride, onChange, onRemove, newDefaults }: {
+function LineEditor({ index, line: l, loading, products, workflows, mode, canOverride, onChange, onRemove, newDefaults }: {
   index: number;
   line: Line;
+  loading: boolean;
   products: BuilderProduct[];
   workflows: { code: string; name: string }[];
   mode: "order" | "quote";
@@ -356,7 +355,7 @@ function LineEditor({ index, line: l, products, workflows, mode, canOverride, on
           <>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="محصول" className="sm:col-span-2">
-                <Select value={l.productId} onChange={(e) => { const d = newDefaults(e.target.value); onChange({ productId: d.productId, selections: d.selections, quantity: d.quantity, price: null, error: null }); }}>
+                <Select value={l.productId} onChange={(e) => { const d = newDefaults(e.target.value); onChange({ productId: d.productId, selections: d.selections, quantity: d.quantity, price: null, error: null, pricedKey: null }); }}>
                   <option value="">انتخاب محصول</option>
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </Select>
@@ -387,14 +386,14 @@ function LineEditor({ index, line: l, products, workflows, mode, canOverride, on
               </div>
             )}
             <div className={cn("mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg px-3 py-2.5 text-[13px]", l.error ? "bg-danger-soft text-danger" : "bg-surface-2")}>
-              {l.error ? l.error : !l.price ? <span className="text-muted">{l.loading ? "در حال محاسبه قیمت…" : "محصول و تعداد را وارد کنید."}</span> : (
+              {l.error ? l.error : !l.price ? <span className="text-muted">{loading ? "در حال محاسبه قیمت…" : "محصول و تعداد را وارد کنید."}</span> : (
                 <>
                   <span>قیمت: <Money rial={l.price.subtotal} strong /></span>
                   <span className="text-muted">واحد <Money rial={l.price.unitPrice} /></span>
                   <span className="text-muted">{METHOD[l.price.method] ?? l.price.method} • {formatNumber(l.price.leadDays)} روز کاری</span>
                   {l.price.customerDiscountPct > 0 && <span className="text-success">تخفیف مشتری {formatPercent(l.price.customerDiscountPct)}</span>}
                   {l.price.costTotal != null && <span className="text-muted">بهای تمام‌شده <Money rial={l.price.costTotal} /> • حاشیه {formatPercent(l.price.marginPct ?? 0)}</span>}
-                  {l.loading && <Spinner className="size-4" />}
+                  {loading && <Spinner className="size-4" />}
                 </>
               )}
             </div>

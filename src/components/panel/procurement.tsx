@@ -11,6 +11,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { api } from "@/lib/api-client";
 import { MATERIAL_REQUEST_STATUS, UNIT } from "@/lib/labels";
 import { formatNumber, formatToman, toEnDigits } from "@/lib/persian";
+import { daysAhead, isoDate } from "@/lib/time";
 import { ReasonAction, useApiAction } from "./actions";
 
 export interface SupplierOption { id: string; name: string; leadTimeDays: number }
@@ -38,7 +39,8 @@ interface Line { materialId: string; quantity: string; unitCost: string; request
 export function RequestsTable({ requests, suppliers, materials, canManage }: { requests: RequestRow[]; suppliers: SupplierOption[]; materials: MaterialPick[]; canManage: boolean }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState(false);
-  const [seed, setSeed] = useState<{ supplierId: string; lines: Line[] }>({ supplierId: "", lines: [] });
+  const [seed, setSeed] = useState<{ supplierId: string; lines: Line[]; expectedAt: string }>({ supplierId: "", lines: [], expectedAt: "" });
+  const expectedFor = (supplierId: string) => isoDate(daysAhead(suppliers.find((s) => s.id === supplierId)?.leadTimeDays ?? 3));
   const openRows = requests.filter((r) => r.status === "OPEN");
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -52,7 +54,8 @@ export function RequestsTable({ requests, suppliers, materials, canManage }: { r
       l.requestIds.push(r.id);
       byMat.set(r.material.id, l);
     }
-    setSeed({ supplierId: rows[0]?.material.defaultSupplierId ?? suppliers[0]?.id ?? "", lines: [...byMat.values()] });
+    const supplierId = rows[0]?.material.defaultSupplierId ?? suppliers[0]?.id ?? "";
+    setSeed({ supplierId, lines: [...byMat.values()], expectedAt: expectedFor(supplierId) });
     setOpen(true);
   };
 
@@ -61,7 +64,7 @@ export function RequestsTable({ requests, suppliers, materials, canManage }: { r
       {canManage && (
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
           <Button size="sm" disabled={sel.size === 0} onClick={() => startPo([...sel])}>ایجاد سفارش خرید از {formatNumber(sel.size)} درخواست</Button>
-          <Button size="sm" variant="secondary" onClick={() => { setSeed({ supplierId: suppliers[0]?.id ?? "", lines: [{ materialId: "", quantity: "", unitCost: "", requestIds: [] }] }); setOpen(true); }}><Plus /> سفارش خرید بدون درخواست</Button>
+          <Button size="sm" variant="secondary" onClick={() => { setSeed({ supplierId: suppliers[0]?.id ?? "", lines: [{ materialId: "", quantity: "", unitCost: "", requestIds: [] }], expectedAt: expectedFor(suppliers[0]?.id ?? "") }); setOpen(true); }}><Plus /> سفارش خرید بدون درخواست</Button>
         </div>
       )}
       {requests.length === 0 ? <p className="px-5 py-10 text-center text-[13px] text-muted">درخواست بازی وجود ندارد.</p> : (
@@ -101,7 +104,7 @@ export function RequestsTable({ requests, suppliers, materials, canManage }: { r
   );
 }
 
-function PurchaseOrderDialog({ open, onOpenChange, seed, suppliers, materials }: { open: boolean; onOpenChange: (o: boolean) => void; seed: { supplierId: string; lines: Line[] }; suppliers: SupplierOption[]; materials: MaterialPick[] }) {
+function PurchaseOrderDialog({ open, onOpenChange, seed, suppliers, materials }: { open: boolean; onOpenChange: (o: boolean) => void; seed: { supplierId: string; lines: Line[]; expectedAt: string }; suppliers: SupplierOption[]; materials: MaterialPick[] }) {
   const { run, pending } = useApiAction();
   const [supplierId, setSupplierId] = useState(seed.supplierId);
   const [lines, setLines] = useState<Line[]>(seed.lines);
@@ -113,8 +116,7 @@ function PurchaseOrderDialog({ open, onOpenChange, seed, suppliers, materials }:
     setLastSeed(seed);
     setSupplierId(seed.supplierId);
     setLines(seed.lines);
-    const lead = suppliers.find((s) => s.id === seed.supplierId)?.leadTimeDays ?? 3;
-    setExpectedAt(new Date(Date.now() + lead * 86_400_000).toISOString().slice(0, 10));
+    setExpectedAt(seed.expectedAt);
     setNote("");
   }
   const total = lines.reduce((s, l) => s + num(l.quantity) * num(l.unitCost), 0);
@@ -148,7 +150,7 @@ function PurchaseOrderDialog({ open, onOpenChange, seed, suppliers, materials }:
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="تأمین‌کننده">
-            <Select value={supplierId} onChange={(e) => { setSupplierId(e.target.value); const lead = suppliers.find((s) => s.id === e.target.value)?.leadTimeDays ?? 3; setExpectedAt(new Date(Date.now() + lead * 86_400_000).toISOString().slice(0, 10)); }}>
+            <Select value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setExpectedAt(isoDate(daysAhead(suppliers.find((s) => s.id === e.target.value)?.leadTimeDays ?? 3))); }}>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </Field>

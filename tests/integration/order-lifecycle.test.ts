@@ -165,6 +165,10 @@ describe("real-world scenario: 100 notebooks with design service", () => {
     // Warehouse issues the paper to the floor
     const paperReqs = await db().select().from(materialRequirements).where(and(eq(materialRequirements.orderItemId, itemId), eq(materialRequirements.purpose, "PAPER")));
     for (const r of paperReqs) await issueRequirement(wh, r.id, r.quantityRequired);
+    // …and the finishing supplies (film, wire, cartons) for later steps
+    const opReqs = await db().select().from(materialRequirements).where(and(eq(materialRequirements.orderItemId, itemId), eq(materialRequirements.purpose, "OPERATION")));
+    expect(opReqs.length).toBeGreaterThan(0);
+    for (const r of opReqs) await issueRequirement(wh, r.id, r.quantityRequired);
 
     await startTask(op, print.id, { machineId: ref.machines.get("DIG-01")! });
     await pauseTask(op, print.id, "ناهار");
@@ -246,6 +250,12 @@ describe("real-world scenario: 100 notebooks with design service", () => {
     expect(o.deliveryStatus).toBe("READY");
     const [job] = await db().select().from(productionJobs).where(eq(productionJobs.orderId, orderId));
     expect(job!.status).toBe("COMPLETED");
+    // Operation supplies were back-flushed when their steps completed (nothing left on the floor).
+    const opReqs = await db().select().from(materialRequirements).where(and(eq(materialRequirements.orderItemId, itemId), eq(materialRequirements.purpose, "OPERATION")));
+    for (const r of opReqs) {
+      expect(r.quantityConsumed + r.quantityWasted + r.quantityReturned).toBeCloseTo(r.quantityIssued, 3);
+      expect(r.status).toBe("COMPLETED");
+    }
   });
 
   it("blocks handover until settled, then partial and full delivery complete the order", async () => {

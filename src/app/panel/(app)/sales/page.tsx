@@ -10,6 +10,7 @@ import { ActionButton, ReasonAction } from "@/components/panel/actions";
 import { FilterTabs, PageHeader, Stat } from "@/components/panel/page";
 import { INQUIRY_STATUS, QUOTE_STATUS } from "@/lib/labels";
 import { formatNumber, formatPhone, toFaDigits } from "@/lib/persian";
+import { daysAgo, daysAhead } from "@/lib/time";
 import { requireStaffPage } from "@/server/http/session";
 import { listInquiries, listQuotes } from "@/server/modules/quotes/queries";
 
@@ -31,7 +32,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const tab = TABS.find((t) => t.key === sp.tab)?.key ?? (inquiries.length ? "inquiries" : "quotes");
   const history = tab === "history" ? await listQuotes(ctx, { status: ["ACCEPTED", "CONVERTED", "REJECTED", "EXPIRED", "CANCELLED"] }) : [];
   const recentAll = await listQuotes(ctx);
-  const last30 = recentAll.filter((q) => q.quote.createdAt > new Date(Date.now() - 30 * 86_400_000));
+  const monthAgo = daysAgo(30);
+  const soon = daysAhead(2);
+  const last30 = recentAll.filter((q) => q.quote.createdAt > monthAgo);
   const decided = last30.filter((q) => ["CONVERTED", "ACCEPTED", "REJECTED", "EXPIRED"].includes(q.quote.status));
   const won = decided.filter((q) => ["CONVERTED", "ACCEPTED"].includes(q.quote.status));
   const counts: Record<string, number> = { inquiries: inquiries.length, quotes: current.length };
@@ -41,7 +44,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       <THead><tr><TH>شماره</TH><TH>مشتری</TH><TH>وضعیت</TH><TH className="text-end">مبلغ</TH><TH>اعتبار تا</TH><TH>صادرکننده</TH><TH /></tr></THead>
       <TBody>
         {rows.map(({ quote: q, customerName, companyName, createdBy, orderNumber }) => {
-          const expiring = q.status === "SENT" && q.validUntil.getTime() - Date.now() < 2 * 86_400_000;
+          const expiring = q.status === "SENT" && q.validUntil < soon;
           return (
             <TR key={q.id}>
               <TD><Link href={`/panel/sales/quotes/${q.id}`} className="font-bold tabular hover:text-accent-ink">{toFaDigits(q.number)}</Link></TD>

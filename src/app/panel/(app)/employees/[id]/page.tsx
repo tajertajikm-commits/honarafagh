@@ -12,6 +12,7 @@ import { TASK_STATUS } from "@/lib/labels";
 import { formatDuration, formatNumber, formatPhone } from "@/lib/persian";
 import { WORKSPACES } from "@/server/auth/permissions";
 import { auditLogs, employees, orders, productionTasks, taskTimeLogs, users } from "@/server/db/schema";
+import { daysAgo } from "@/lib/time";
 import { requireStaffPage } from "@/server/http/session";
 import { listRoles } from "@/server/modules/people/service";
 
@@ -30,7 +31,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
   const assigned = roles.filter((r) => roleIds.includes(r.id));
   const effectivePerms = new Set(assigned.flatMap((r) => r.permissions));
   const effectiveWs = new Set(assigned.flatMap((r) => r.workspaces));
-  const since = new Date(Date.now() - 30 * 86_400_000);
+  const since = daysAgo(30);
   const [time] = await ctx.db
     .select({ minutes: sql<number>`coalesce(sum(extract(epoch from (coalesce(${taskTimeLogs.endedAt}, now()) - ${taskTimeLogs.startedAt})) / 60), 0)::float` })
     .from(taskTimeLogs)

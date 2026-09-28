@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { outboxEvents } from "@/server/db/schema";
+import type { outboxEvents } from "@/server/db/schema";
 import { systemCtx } from "@/server/core/context";
 import { dispatchAccounting } from "@/server/modules/notifications/accounting";
 import { dispatchNotifications } from "@/server/modules/notifications/service";

@@ -2,7 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -60,7 +60,6 @@ export function PricingAdmin({ version, publishedId, perms, materials, products,
   const [issues, setIssues] = useState<{ path: string; message: string }[]>([]);
   const [dirty, setDirty] = useState(false);
   const up = (r: Rules) => { setRules(r); setDirty(true); };
-  useEffect(() => { setRules(version.data); setNotes(version.notes ?? ""); setDirty(false); setJson(null); }, [version]);
 
   const save = async () => {
     setIssues([]);
@@ -204,6 +203,18 @@ export function PricingAdmin({ version, publishedId, perms, materials, products,
   );
 }
 
+function defaultSelections(product: BuilderProduct | undefined) {
+  const s: Record<string, string | number | boolean> = {};
+  for (const g of product?.groups ?? []) {
+    if (g.type === "SELECT") {
+      const d = g.values.find((v) => v.isDefault) ?? g.values[0];
+      if (d) s[g.key] = d.key;
+    } else if (g.type === "NUMBER" && g.config?.default != null) s[g.key] = g.config.default;
+    else if (g.type === "TOGGLE") s[g.key] = false;
+  }
+  return s;
+}
+
 interface Breakdown { subtotal: number; total: number; costTotal: number; profit: number; marginPct: number; unitPrice: number; leadDays: number; method: string; markupPct: number; lines: { code: string; label: string; category: string; quantity: number; unit: string; amount: number }[]; impositions: { name: string; ups: number; pressSheets: number; stockSheets: number; forms: number; wasteSheets: number }[]; alternatives: { method: string; costTotal: number; subtotal: number }[]; warnings: string[] }
 
 function Simulator({ versionId, publishedId, isDraft, dirty, products, initialProductId }: { versionId: string; publishedId: string | null; isDraft: boolean; dirty: boolean; products: BuilderProduct[]; initialProductId?: string }) {
@@ -213,17 +224,7 @@ function Simulator({ versionId, publishedId, isDraft, dirty, products, initialPr
   const [urgency, setUrgency] = useState("STANDARD");
   const [result, setResult] = useState<{ current?: Breakdown; published?: Breakdown; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const defaults = useMemo(() => {
-    const s: Record<string, string | number | boolean> = {};
-    for (const g of product?.groups ?? []) {
-      if (g.type === "SELECT") { const d = g.values.find((v) => v.isDefault) ?? g.values[0]; if (d) s[g.key] = d.key; }
-      else if (g.type === "NUMBER" && g.config?.default != null) s[g.key] = g.config.default;
-      else if (g.type === "TOGGLE") s[g.key] = false;
-    }
-    return s;
-  }, [product]);
-  const [sel, setSel] = useState(defaults);
-  useEffect(() => { setSel(defaults); }, [defaults]);
+  const [sel, setSel] = useState(() => defaultSelections(product));
 
   const runSim = async () => {
     if (!product) return;
@@ -248,7 +249,7 @@ function Simulator({ versionId, publishedId, isDraft, dirty, products, initialPr
       <CardHeader title="شبیه‌ساز قیمت" description={isDraft ? "مقایسه پیش‌نویس (ذخیره‌شده) با نسخه منتشرشده" : "محاسبه با این نسخه"} />
       <CardBody className="space-y-3 pt-0">
         <div className="grid grid-cols-2 gap-2">
-          <Field label="محصول" className="col-span-2"><Select value={productId} onChange={(e) => { setProductId(e.target.value); const np = products.find((x) => x.id === e.target.value); setQty(String(np?.quantityPresets[1] ?? np?.minQuantity ?? 100)); setResult(null); }}>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
+          <Field label="محصول" className="col-span-2"><Select value={productId} onChange={(e) => { setProductId(e.target.value); const np = products.find((x) => x.id === e.target.value); setQty(String(np?.quantityPresets[1] ?? np?.minQuantity ?? 100)); setSel(defaultSelections(np)); setResult(null); }}>{products.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select></Field>
           <Field label="تیراژ"><Input ltr inputMode="numeric" value={qty} onChange={(e) => setQty(toEnDigits(e.target.value).replace(/\D/g, ""))} /></Field>
           <Field label="فوریت"><Select value={urgency} onChange={(e) => setUrgency(e.target.value)}><option value="STANDARD">عادی</option><option value="EXPRESS">فوری</option><option value="RUSH">خیلی فوری</option></Select></Field>
           {(product?.groups ?? []).filter((g) => g.type === "SELECT").map((g) => (

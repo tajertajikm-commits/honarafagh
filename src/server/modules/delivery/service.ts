@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { customers, deliveryMethods, orderItems, orders, shipmentItems, shipments, type AddressSnapshot } from "@/server/db/schema";
 import { type Ctx, actorUserId, assertCan, assertCanAny, inTx, isStaff } from "@/server/core/context";
 import { forbidden, invalidState, notFound, validation } from "@/server/core/errors";
@@ -39,11 +39,12 @@ export async function assertSettledForDelivery(ctx: Ctx, o: typeof orders.$infer
   if (!rules.requireSettlementBeforeDelivery) return;
   const [c] = await ctx.db.select({ creditLimit: customers.creditLimit }).from(customers).where(eq(customers.id, o.customerId));
   if (c && c.creditLimit > 0) {
-    const [{ owed }] = (await ctx.db
-      .select({ owed: sql<number>`coalesce(sum(${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount})), 0)::float` })
+    // This order's balance plus whatever the customer owes on their other open orders.
+    const [{ others }] = (await ctx.db
+      .select({ others: sql<number>`coalesce(sum(${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount})), 0)::float` })
       .from(orders)
-      .where(and(eq(orders.customerId, o.customerId), notInArray(orders.status, ["CANCELLED", "PENDING_REVIEW"]), sql`${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount}) > 0`))) as [{ owed: number }];
-    if (owed <= c.creditLimit) return;
+      .where(and(eq(orders.customerId, o.customerId), ne(orders.id, o.id), notInArray(orders.status, ["CANCELLED", "PENDING_REVIEW"]), sql`${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount}) > 0`))) as [{ others: number }];
+    if (balance + others <= c.creditLimit) return;
   }
   throw invalidState(`مانده این سفارش ${formatToman(balance)} است. تحویل پس از تسویه یا با مجوز مدیر (عبور از شرط پرداخت) ممکن است.`);
 }
