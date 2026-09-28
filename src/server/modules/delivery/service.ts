@@ -1,12 +1,13 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
-import { deliveryMethods, orderItems, orders, shipmentItems, shipments, type AddressSnapshot } from "@/server/db/schema";
+import { customers, deliveryMethods, orderItems, orders, shipmentItems, shipments, type AddressSnapshot } from "@/server/db/schema";
 import { type Ctx, actorUserId, assertCan, assertCanAny, inTx, isStaff } from "@/server/core/context";
 import { forbidden, invalidState, notFound, validation } from "@/server/core/errors";
 import { audit } from "@/server/modules/audit/audit";
 import { emit } from "@/server/events/outbox";
 import { deliveryProvider } from "@/server/integrations/delivery";
 import { orderEvent, recomputeOrder } from "@/server/modules/orders/state";
-import { formatNumber } from "@/lib/persian";
+import { getSetting } from "@/server/modules/settings/service";
+import { formatNumber, formatToman } from "@/lib/persian";
 
 type Shipment = typeof shipments.$inferSelect;
 const OPEN: Shipment["status"][] = ["PENDING", "ASSIGNED", "OUT_FOR_DELIVERY"];
@@ -24,6 +25,27 @@ export async function shippableQuantities(ctx: Ctx, orderId: string) {
     item: i,
     remaining: Math.max(0, i.quantity - i.quantityDelivered - (inTransit.find((t) => t.itemId === i.id)?.q ?? 0)),
   }));
+}
+
+/**
+ * Settlement gate for goods leaving the shop. Passes when the order is fully
+ * paid, a manager overrode the payment gate, the rule is switched off, or the
+ * customer's credit limit covers everything they currently owe.
+ */
+export async function assertSettledForDelivery(ctx: Ctx, o: typeof orders.$inferSelect) {
+  const balance = o.total - (o.paidAmount - o.refundedAmount);
+  if (balance <= 0 || o.paymentGateOverride) return;
+  const rules = await getSetting(ctx.db, "orders");
+  if (!rules.requireSettlementBeforeDelivery) return;
+  const [c] = await ctx.db.select({ creditLimit: customers.creditLimit }).from(customers).where(eq(customers.id, o.customerId));
+  if (c && c.creditLimit > 0) {
+    const [{ owed }] = (await ctx.db
+      .select({ owed: sql<number>`coalesce(sum(${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount})), 0)::float` })
+      .from(orders)
+      .where(and(eq(orders.customerId, o.customerId), notInArray(orders.status, ["CANCELLED", "PENDING_REVIEW"]), sql`${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount}) > 0`))) as [{ owed: number }];
+    if (owed <= c.creditLimit) return;
+  }
+  throw invalidState(`مانده این سفارش ${formatToman(balance)} است. تحویل پس از تسویه یا با مجوز مدیر (عبور از شرط پرداخت) ممکن است.`);
 }
 
 export async function createShipment(
@@ -48,6 +70,7 @@ export async function createShipment(
     const [o] = await tx.db.select().from(orders).where(eq(orders.id, orderId)).for("update");
     if (!o) throw notFound("سفارش");
     if (["CANCELLED", "PENDING_REVIEW"].includes(o.status)) throw invalidState("این سفارش قابل ارسال نیست.");
+    await assertSettledForDelivery(tx, o);
     const [method] = await tx.db.select().from(deliveryMethods).where(eq(deliveryMethods.id, input.methodId));
     if (!method) throw validation("روش ارسال نامعتبر است.");
     const shippable = await shippableQuantities(tx, orderId);

@@ -166,6 +166,18 @@ export async function completeTask(ctx: Ctx, taskId: string, input: CompleteInpu
         if (c.consumed + c.wasted > 0) await recordConsumption(tx, c.requirementId, { consumed: c.consumed, wasted: c.wasted, taskId: t.id, note: input.notes });
       }
     }
+    // Backflush: operation supplies (plates, film, wire, cartons) issued for this
+    // step and not reported explicitly are consumed in full when the step ends.
+    // Paper is always reported by the operator so leftover sheets can be returned.
+    const reported = new Set((input.consumption ?? []).map((c) => c.requirementId));
+    const stepReqs = await tx.db
+      .select()
+      .from(materialRequirements)
+      .where(and(eq(materialRequirements.orderItemId, itemId), eq(materialRequirements.stepTypeCode, t.stepTypeCode), ne(materialRequirements.purpose, "PAPER")));
+    for (const r of stepReqs) {
+      const outstanding = Math.round((r.quantityIssued - r.quantityConsumed - r.quantityWasted - r.quantityReturned) * 1000) / 1000;
+      if (!reported.has(r.id) && outstanding > 0) await recordConsumption(tx, r.id, { consumed: outstanding, wasted: 0, taskId: t.id, note: "مصرف خودکار در پایان مرحله" });
+    }
     await closeLog(tx, t.id, "COMPLETE");
     const quantityCompleted = input.quantityCompleted ?? t.quantityPlanned;
     if (quantityCompleted < 0) throw validation("تعداد تولیدشده نامعتبر است.");

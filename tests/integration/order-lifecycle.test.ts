@@ -248,25 +248,31 @@ describe("real-world scenario: 100 notebooks with design service", () => {
     expect(job!.status).toBe("COMPLETED");
   });
 
-  it("partial delivery, then full delivery; order completes only once settled", async () => {
+  it("blocks handover until settled, then partial and full delivery complete the order", async () => {
     const ship = await staffCtx(ref, SHIPPING);
-    const s1 = await createShipment(ship, orderId, { methodId: ref.deliveryMethods.get("COURIER")!, items: [{ orderItemId: itemId, quantity: 60 }], assigneeId: ref.employees.get(SHIPPING)!.employeeId });
-    await expect(createShipment(ship, orderId, { methodId: ref.deliveryMethods.get("COURIER")!, items: [{ orderItemId: itemId, quantity: 50 }] })).rejects.toThrow(/حداکثر/);
-    await dispatchShipment(ship, s1.id);
-    await completeShipment(ship, s1.id, { recipientName: "خانم نمونه" });
-    expect((await orderRow(orderId)).deliveryStatus).toBe("PARTIALLY_DELIVERED");
-
-    const s2 = await createShipment(ship, orderId, { methodId: ref.deliveryMethods.get("COURIER")!, assigneeId: ref.employees.get(SHIPPING)!.employeeId });
-    await dispatchShipment(ship, s2.id);
-    await completeShipment(ship, s2.id, { recipientName: "خانم نمونه" });
-    let o = await orderRow(orderId);
-    expect(o.deliveryStatus).toBe("DELIVERED");
-    expect(o.status).toBe("READY"); // delivered but not settled
+    const courier = ref.deliveryMethods.get("COURIER")!;
+    // Goods do not leave while a balance is open (no override, no credit line).
+    await expect(createShipment(ship, orderId, { methodId: courier, items: [{ orderItemId: itemId, quantity: 60 }] })).rejects.toThrow(/مانده/);
 
     const acc = await staffCtx(ref, ACCOUNTANT);
+    let o = await orderRow(orderId);
     await recordManualPayment(acc, orderId, { method: "BANK_TRANSFER", amount: o.total - o.paidAmount, reference: "123456", idempotencyKey: "settle" });
     o = await orderRow(orderId);
     expect(o.paymentStatus).toBe("PAID");
+    expect(o.status).toBe("READY"); // paid but not delivered
+
+    const s1 = await createShipment(ship, orderId, { methodId: courier, items: [{ orderItemId: itemId, quantity: 60 }], assigneeId: ref.employees.get(SHIPPING)!.employeeId });
+    await expect(createShipment(ship, orderId, { methodId: courier, items: [{ orderItemId: itemId, quantity: 50 }] })).rejects.toThrow(/حداکثر/);
+    await dispatchShipment(ship, s1.id);
+    await completeShipment(ship, s1.id, { recipientName: "خانم نمونه" });
+    expect((await orderRow(orderId)).deliveryStatus).toBe("PARTIALLY_DELIVERED");
+    expect((await orderRow(orderId)).status).toBe("READY");
+
+    const s2 = await createShipment(ship, orderId, { methodId: courier, assigneeId: ref.employees.get(SHIPPING)!.employeeId });
+    await dispatchShipment(ship, s2.id);
+    await completeShipment(ship, s2.id, { recipientName: "خانم نمونه" });
+    o = await orderRow(orderId);
+    expect(o.deliveryStatus).toBe("DELIVERED");
     expect(o.status).toBe("COMPLETED");
   });
 

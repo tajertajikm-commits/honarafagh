@@ -21,6 +21,8 @@ export const settingsSchemas = {
     defaultDepositPct: z.number().int().min(0).max(100),
     quoteValidityDays: z.number().int().min(1).max(90),
     autoConfirmPaidWebOrders: z.boolean(),
+    /** Goods leave (dispatch or pickup) only when the order is settled, unless overridden or covered by customer credit. */
+    requireSettlementBeforeDelivery: z.boolean().default(true),
   }),
 };
 export type SettingKey = keyof typeof settingsSchemas;
@@ -28,7 +30,7 @@ export type SettingValue<K extends SettingKey> = z.infer<(typeof settingsSchemas
 
 const DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   business: { name: "چاپخانه هنر آفاق", phone: "", address: "", workdays: [6, 0, 1, 2, 3], thursdayHalf: true, workStart: "08:00", workEnd: "17:00" },
-  orders: { defaultDepositPct: 50, quoteValidityDays: 7, autoConfirmPaidWebOrders: true },
+  orders: { defaultDepositPct: 50, quoteValidityDays: 7, autoConfirmPaidWebOrders: true, requireSettlementBeforeDelivery: true },
 };
 
 export async function getSetting<K extends SettingKey>(db: Executor, key: K): Promise<SettingValue<K>> {

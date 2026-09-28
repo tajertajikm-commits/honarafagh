@@ -27,6 +27,9 @@ export interface ArtworkVersionView {
   file: { id: string; originalName: string; mimeType: string; sizeBytes: number };
 }
 
+/** Design work produces designer drafts; everything else is prepared for print. */
+const defaultStage = (it: { fileStatus: string; needsDesign: boolean }) => (it.needsDesign && ["IN_DESIGN", "NEEDS_REVISION", "AWAITING_FILE"].includes(it.fileStatus) ? "DESIGNER" : "PREPRESS");
+
 export function ArtworkPanel({ items, versions, perms }: { items: { id: string; title: string; fileStatus: string; needsDesign: boolean }[]; versions: ArtworkVersionView[]; perms: string[] }) {
   const can = (p: string) => perms.includes(p);
   const { run, pending, toast } = useApiAction();
@@ -79,11 +82,11 @@ export function ArtworkPanel({ items, versions, perms }: { items: { id: string; 
             {can("file.upload") && (
               <div className="mt-3 space-y-2 rounded-xl bg-surface-2/50 p-3">
                 <div className="grid gap-2 sm:grid-cols-[180px_1fr]">
-                  <Field label="نوع نسخه"><Select value={stage[it.id] ?? "PREPRESS"} onChange={(e) => setStage({ ...stage, [it.id]: e.target.value })}><option value="DESIGNER">طرح طراح</option><option value="PREPRESS">فایل پیش از چاپ</option><option value="PRINT_READY">آماده چاپ</option></Select></Field>
+                  <Field label="نوع نسخه"><Select value={stage[it.id] ?? defaultStage(it)} onChange={(e) => setStage({ ...stage, [it.id]: e.target.value })}><option value="DESIGNER">طرح طراح</option><option value="PREPRESS">فایل پیش از چاپ</option><option value="PRINT_READY">آماده چاپ</option></Select></Field>
                   <FileDrop purpose="ARTWORK" compact files={files[it.id] ?? []} onChange={(f) => setFiles({ ...files, [it.id]: f })} onError={toast.error} />
                 </div>
                 {(files[it.id]?.length ?? 0) > 0 && (
-                  <Button size="sm" loading={pending} onClick={() => run(async () => { for (const f of files[it.id]!) await api(`order-items/${it.id}/artwork`, { body: { fileId: f.id, stage: stage[it.id] ?? "PREPRESS" } }); setFiles({ ...files, [it.id]: [] }); }, "نسخه جدید ثبت شد.")}>ثبت نسخه جدید</Button>
+                  <Button size="sm" loading={pending} onClick={() => run(async () => { for (const f of files[it.id]!) await api(`order-items/${it.id}/artwork`, { body: { fileId: f.id, stage: stage[it.id] ?? defaultStage(it) } }); setFiles({ ...files, [it.id]: [] }); }, "نسخه جدید ثبت شد.")}>ثبت نسخه جدید</Button>
                 )}
               </div>
             )}

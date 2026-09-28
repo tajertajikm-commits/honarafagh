@@ -24,6 +24,7 @@ import { deliveryMethods, employees, machines, users, vehicles } from "@/server/
 import { isAppError } from "@/server/core/errors";
 import { requireStaffPage } from "@/server/http/session";
 import { shippableQuantities } from "@/server/modules/delivery/service";
+import { couriers as courierList } from "@/server/modules/delivery/queries";
 import { getStaffOrder } from "@/server/modules/orders/queries";
 import type { PriceBreakdown } from "@/server/modules/pricing/types";
 
@@ -48,6 +49,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
   const methods = await ctx.db.select().from(deliveryMethods).where(eq(deliveryMethods.isActive, true)).orderBy(asc(deliveryMethods.sortOrder));
   const vs = await ctx.db.select().from(vehicles).where(eq(vehicles.isActive, true));
   const shippable = await shippableQuantities(ctx, id);
+  const couriers = await courierList(ctx);
   const empName = new Map(staff.map((s) => [s.id, s.name]));
   const machineName = new Map(ms.map((m) => [m.id, m.name]));
   const balance = o.total - (o.paidAmount - o.refundedAmount);
@@ -216,7 +218,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
             <Card>
               <CardHeader title="پرداخت‌ها" description={<>پرداخت‌شده <Money rial={o.paidAmount - o.refundedAmount} /> · مانده <Money rial={balance} className={balance > 0 ? "text-danger" : ""} /> · پیش‌پرداخت {toFaDigits(o.depositPct)}٪{o.paymentGateOverride && " (شرط برداشته شده)"}</>} icon={<CreditCard />} />
               <CardBody className="pt-0">
-                <PaymentsPanel orderId={o.id} balance={balance} paid={o.paidAmount - o.refundedAmount} perms={perms} payments={d.payments.filter((p) => p.status !== "PENDING").map((p) => ({ id: p.id, number: p.number, kind: p.kind, method: p.method, status: p.status, amount: p.amount, reference: p.method === "ONLINE" ? p.providerRefId : p.reference, note: p.note, receiptFileId: p.receiptFileId, createdAt: p.createdAt.toISOString(), rejectionReason: p.rejectionReason }))} />
+                <PaymentsPanel orderId={o.id} balance={balance} paid={o.paidAmount - o.refundedAmount} perms={perms} payments={d.payments.filter((p) => p.status !== "PENDING").map((p) => ({ id: p.id, number: p.number, kind: p.kind, method: p.method, status: p.status, amount: p.amount, reference: p.method === "ONLINE" ? p.providerRefId : p.reference, note: p.note, receiptFileId: p.receiptFileId, createdAt: p.createdAt.toISOString(), rejectionReason: p.rejectionReason, chequeDueDate: p.chequeDueDate?.toISOString() ?? null }))} />
               </CardBody>
             </Card>
             <Card>
@@ -227,7 +229,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                   perms={perms}
                   defaultMethodId={o.deliveryMethodId}
                   methods={methods.map((m) => ({ id: m.id, name: m.name, kind: m.kind }))}
-                  couriers={staff}
+                  couriers={couriers}
                   vehicles={vs.map((v) => ({ id: v.id, name: `${v.name} (${v.plateNumber ?? ""})` }))}
                   shippable={shippable.map((s) => ({ itemId: s.item.id, title: s.item.title, remaining: s.item.productionStatus === "COMPLETED" ? s.remaining : Math.min(s.remaining, s.item.quantityProduced) }))}
                   shipments={d.shipments.map((s) => ({
@@ -236,6 +238,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                     status: s.status,
                     methodName: methods.find((m) => m.id === s.methodId)?.name ?? "",
                     methodKind: methods.find((m) => m.id === s.methodId)?.kind ?? "",
+                    assigneeId: s.assigneeId,
                     assigneeName: s.assigneeId ? (empName.get(s.assigneeId) ?? null) : null,
                     vehicleName: vs.find((v) => v.id === s.vehicleId)?.name ?? null,
                     trackingCode: s.trackingCode,

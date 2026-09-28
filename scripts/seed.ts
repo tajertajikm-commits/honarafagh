@@ -4,6 +4,8 @@ import { seedDemo } from "@/server/seed/seed-demo";
 import { seedReference } from "@/server/seed/seed-reference";
 
 async function main() {
+  // The outbox is drained explicitly below; inline dispatch would outlive the pool.
+  process.env.WORKER_INLINE = "false";
   const db = getDb();
   const withDemo = !process.argv.includes("--reference-only");
   console.info("[seed] reference data…");
