@@ -56,7 +56,7 @@ export function ProfileForm({ customer, addresses }: { customer: Customer; addre
               <div>
                 <p className="font-bold">{ad.title} {ad.isDefault && <Badge tone="info" className="ms-1">پیش‌فرض</Badge>}</p>
                 <p className="text-muted">{ad.province}، {ad.city}، {ad.line}</p>
-                <p className="text-muted">{ad.recipientName} · <bdi dir="ltr">{formatPhone(ad.recipientPhone)}</bdi></p>
+                <p className="text-muted">{ad.recipientName} • <bdi dir="ltr">{formatPhone(ad.recipientPhone)}</bdi></p>
               </div>
               <Button variant="danger-ghost" size="icon-sm" aria-label="حذف آدرس" onClick={() => run(() => api(`account/addresses/${ad.id}`, { method: "DELETE" }), "آدرس حذف شد.")}><Trash2 /></Button>
             </div>

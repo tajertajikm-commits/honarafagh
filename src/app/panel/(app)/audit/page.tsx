@@ -37,7 +37,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   };
   return (
     <>
-      <PageHeader title="گزارش ممیزی" description={`${formatNumber(total)} رویداد · ثبت‌ها غیرقابل ویرایش و حذف‌اند (محافظت در سطح پایگاه داده).`} />
+      <PageHeader title="گزارش ممیزی" description={`${formatNumber(total)} رویداد • ثبت‌ها غیرقابل ویرایش و حذف‌اند (محافظت در سطح پایگاه داده).`} />
       <form className="mb-4 flex flex-wrap items-end gap-2" action="/panel/audit">
         <label className="text-[12.5px] font-bold text-muted">نوع موجودیت
           <select name="type" defaultValue={sp.type ?? ""} className="mt-1 block h-9 rounded-lg border border-line-strong bg-surface px-2 text-[13px]">
@@ -73,7 +73,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                     <div className="mt-3 grid gap-3 lg:grid-cols-2">
                       <div><p className="mb-1 text-[12px] font-bold text-muted">قبل</p><Json value={a.before} /></div>
                       <div><p className="mb-1 text-[12px] font-bold text-muted">بعد</p><Json value={a.after} /></div>
-                      <p className="text-[11.5px] text-subtle lg:col-span-2" dir="ltr">entity {a.entityId} · request {String(a.context?.requestId ?? "—")} · ip {String(a.context?.ip ?? "—")}</p>
+                      <p className="text-[11.5px] text-subtle lg:col-span-2" dir="ltr">entity {a.entityId} • request {String(a.context?.requestId ?? "—")} • ip {String(a.context?.ip ?? "—")}</p>
                     </div>
                   </details>
                 </li>

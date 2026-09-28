@@ -108,7 +108,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
       <PageHeader
         crumbs={[{ href: "/panel/orders", label: "سفارش‌ها" }]}
         title={<span className="flex flex-wrap items-center gap-3">سفارش <OrderNo n={o.number} />{o.priority !== "NORMAL" && <Status map={PRIORITY} value={o.priority} />}{o.urgency !== "STANDARD" && <Badge tone="warning">{URGENCY[o.urgency]}</Badge>}</span>}
-        description={<>ثبت <DateText value={o.placedAt} withTime /> · منبع: {({ WEBSITE: "وب‌سایت", SALES: "فروش", QUOTE: "پیش‌فاکتور", PHONE: "تلفنی", API: "API" } as Record<string, string>)[o.source]}{o.dueDate && <> · موعد تحویل: <b className="text-ink"><DateText value={o.dueDate} /></b></>}{o.projectedCompletionAt && <> · برآورد اتمام: <DateText value={o.projectedCompletionAt} withTime /></>}</>}
+        description={<>ثبت <DateText value={o.placedAt} withTime /> • منبع: {({ WEBSITE: "وب‌سایت", SALES: "فروش", QUOTE: "پیش‌فاکتور", PHONE: "تلفنی", API: "API" } as Record<string, string>)[o.source]}{o.dueDate && <> • موعد تحویل: <b className="text-ink"><DateText value={o.dueDate} /></b></>}{o.projectedCompletionAt && <> • برآورد اتمام: <DateText value={o.projectedCompletionAt} withTime /></>}</>}
         actions={<OrderHeaderActions order={{ id: o.id, status: o.status, priority: o.priority, discountAmount: o.discountAmount, depositPct: o.depositPct, paymentGateOverride: o.paymentGateOverride }} perms={perms} />}
       />
 
@@ -147,16 +147,16 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                       <div>
                         <p className="text-[14.5px] font-bold">{it.title} <span className="font-medium text-muted">× {formatNumber(it.quantity)} {it.unitLabel}</span></p>
                         <p className="mt-0.5 text-[12.5px] text-muted">
-                          {it.productionMethod && <>چاپ {METHOD[it.productionMethod]} · </>}{it.workflowTemplateCode && <>{wfNames.get(it.workflowTemplateCode) ?? it.workflowTemplateCode}</>}{snap && <> · آماده‌سازی {toFaDigits(snap.leadDays)} روز</>}
+                          {it.productionMethod && <>چاپ {METHOD[it.productionMethod]} • </>}{it.workflowTemplateCode && <>{wfNames.get(it.workflowTemplateCode) ?? it.workflowTemplateCode}</>}{snap && <> • آماده‌سازی {toFaDigits(snap.leadDays)} روز</>}
                           {it.isPriceOverridden && <Badge tone="warning" className="ms-2">قیمت دستی</Badge>}
                         </p>
                       </div>
                       <div className="text-end">
                         <Money rial={it.lineSubtotal} strong />
-                        {d.canSeeCosts && <p className="text-[11.5px] text-muted">بهای تمام‌شده <Money rial={it.costTotal} unit={false} /> · حاشیه {formatPercent(margin)}</p>}
+                        {d.canSeeCosts && <p className="text-[11.5px] text-muted">بهای تمام‌شده <Money rial={it.costTotal} unit={false} /> • حاشیه {formatPercent(margin)}</p>}
                       </div>
                     </div>
-                    {snap && <p className="mt-2 text-[12.5px] leading-6 text-ink-2">{snap.spec.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" · ")}</p>}
+                    {snap && <p className="mt-2 text-[12.5px] leading-6 text-ink-2">{snap.spec.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" • ")}</p>}
                     {snap && d.canSeeCosts && (
                       <details className="mt-2 text-[12px]">
                         <summary className="cursor-pointer font-bold text-muted">جزئیات محاسبه و چیدمان فرم</summary>
@@ -169,7 +169,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                           <ul className="space-y-1">
                             {snap.impositions.map((im) => (
                               <li key={im.component} className="rounded-lg bg-surface-2/60 px-3 py-2">
-                                <b>{im.name}</b>: {toFaDigits(im.ups)} عدد در برگ · {toFaDigits(im.forms)} فرم · {formatNumber(im.runSheets)} برگ چاپ + {formatNumber(im.wasteSheets)} ضایعات · {formatNumber(im.stockSheets)} برگ کاغذ{im.plates ? ` · ${toFaDigits(im.plates)} زینک` : ""}
+                                <b>{im.name}</b>: {toFaDigits(im.ups)} عدد در برگ • {toFaDigits(im.forms)} فرم • {formatNumber(im.runSheets)} برگ چاپ + {formatNumber(im.wasteSheets)} ضایعات • {formatNumber(im.stockSheets)} برگ کاغذ{im.plates ? ` • ${toFaDigits(im.plates)} زینک` : ""}
                               </li>
                             ))}
                             <li className="text-muted">نسخه قیمت‌گذاری: <Code>{snap.ruleVersionId.slice(0, 8)}</Code></li>
@@ -217,7 +217,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
 
           <div className="grid items-start gap-5 2xl:grid-cols-2">
             <Card>
-              <CardHeader title="پرداخت‌ها" description={<>پرداخت‌شده <Money rial={o.paidAmount - o.refundedAmount} /> · مانده <Money rial={balance} className={balance > 0 ? "text-danger" : ""} /> · پیش‌پرداخت {toFaDigits(o.depositPct)}٪{o.paymentGateOverride && " (شرط برداشته شده)"}</>} icon={<CreditCard />} />
+              <CardHeader title="پرداخت‌ها" description={<>پرداخت‌شده <Money rial={o.paidAmount - o.refundedAmount} /> • مانده <Money rial={balance} className={balance > 0 ? "text-danger" : ""} /> • پیش‌پرداخت {toFaDigits(o.depositPct)}٪{o.paymentGateOverride && " (شرط برداشته شده)"}</>} icon={<CreditCard />} />
               <CardBody className="pt-0">
                 <PaymentsPanel orderId={o.id} balance={balance} paid={o.paidAmount - o.refundedAmount} perms={perms} payments={d.payments.filter((p) => p.status !== "PENDING").map((p) => ({ id: p.id, number: p.number, kind: p.kind, method: p.method, status: p.status, amount: p.amount, reference: p.method === "ONLINE" ? p.providerRefId : p.reference, note: p.note, receiptFileId: p.receiptFileId, createdAt: p.createdAt.toISOString(), rejectionReason: p.rejectionReason, chequeDueDate: p.chequeDueDate?.toISOString() ?? null }))} />
               </CardBody>
@@ -265,8 +265,8 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                     <span className="flex-1">
                       <Badge className="me-1.5">{({ ORDER: "سفارش", PAYMENT: "پرداخت", FILE: "فایل", PROCUREMENT: "مواد", PRODUCTION: "تولید", QC: "کیفیت", DELIVERY: "ارسال" } as Record<string, string>)[e.domain] ?? e.domain}</Badge>
                       {e.message ?? (e.fromState || e.toState ? stateChange(e.domain, e.fromState, e.toState) : e.type)}
-                      <span className="text-muted"> · {actorName ?? "سیستم"}</span>
-                      {e.visibleToCustomer && <span className="text-[11px] text-info"> · قابل مشاهده برای مشتری</span>}
+                      <span className="text-muted"> • {actorName ?? "سیستم"}</span>
+                      {e.visibleToCustomer && <span className="text-[11px] text-info"> • قابل مشاهده برای مشتری</span>}
                     </span>
                   </li>
                 ))}
@@ -282,7 +282,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
               <p className="text-[14px] font-bold">{d.customer.fullName}</p>
               {d.customer.companyName && <p className="text-[12.5px] text-muted">{d.customer.companyName}</p>}
               <p className="mt-1 text-[13px]"><bdi dir="ltr" className="tabular">{formatPhone(d.customer.phone)}</bdi></p>
-              {o.shippingAddress && <p className="mt-3 text-[12.5px] leading-6 text-muted">{d.deliveryMethod?.name}<br />{o.shippingAddress.city}، {o.shippingAddress.line}<br />{o.shippingAddress.recipientName} · <bdi dir="ltr">{o.shippingAddress.recipientPhone}</bdi></p>}
+              {o.shippingAddress && <p className="mt-3 text-[12.5px] leading-6 text-muted">{d.deliveryMethod?.name}<br />{o.shippingAddress.city}، {o.shippingAddress.line}<br />{o.shippingAddress.recipientName} • <bdi dir="ltr">{o.shippingAddress.recipientPhone}</bdi></p>}
               {!o.shippingAddress && d.deliveryMethod && <p className="mt-3 text-[12.5px] text-muted">{d.deliveryMethod.name}</p>}
               {o.customerNote && <p className="mt-3 rounded-lg bg-warning-soft px-3 py-2 text-[12.5px] text-ink-2">یادداشت مشتری: {o.customerNote}</p>}
               {o.internalNote && <p className="mt-2 whitespace-pre-line rounded-lg bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">{o.internalNote}</p>}
@@ -299,7 +299,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                 {d.changeRequests.map((c) => (
                   <div key={c.id} className="rounded-xl border border-line p-3 text-[12.5px]">
                     <p>{c.description}</p>
-                    <p className="mt-1 text-muted"><DateText value={c.createdAt} relative /> · {c.status === "PENDING" ? "در انتظار" : c.status === "APPROVED" ? "پذیرفته" : "رد شده"}{c.resolution ? ` — ${c.resolution}` : ""}</p>
+                    <p className="mt-1 text-muted"><DateText value={c.createdAt} relative /> • {c.status === "PENDING" ? "در انتظار" : c.status === "APPROVED" ? "پذیرفته" : "رد شده"}{c.resolution ? ` — ${c.resolution}` : ""}</p>
                     {c.status === "PENDING" && can("order.edit") && <ResolveChange id={c.id} />}
                   </div>
                 ))}

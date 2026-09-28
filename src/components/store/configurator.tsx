@@ -213,7 +213,7 @@ export function Configurator({ product, loggedIn }: { product: ConfiguratorProdu
           <div className="brand-spectrum-rtl h-1" />
           <div className="p-5">
             <p className="text-[13px] text-muted">
-              {product.name} · {formatNumber(quantity)} {product.unitLabel}
+              {product.name} • {formatNumber(quantity)} {product.unitLabel}
             </p>
             <div className="mt-2 min-h-[64px]">
               {loading && !price ? (
@@ -227,7 +227,7 @@ export function Configurator({ product, loggedIn }: { product: ConfiguratorProdu
                 <div className={cn("transition-opacity", loading && "opacity-50")}>
                   <Money rial={price.total} className="text-[30px] font-bold" />
                   <p className="mt-0.5 text-[12.5px] text-muted">
-                    هر {product.unitLabel} <Money rial={Math.round(price.subtotal / quantity)} className="text-[12.5px]" /> · شامل {formatNumber(price.vatPct)}٪ مالیات بر ارزش افزوده
+                    هر {product.unitLabel} <Money rial={Math.round(price.subtotal / quantity)} className="text-[12.5px]" /> • شامل {formatNumber(price.vatPct)}٪ مالیات بر ارزش افزوده
                   </p>
                 </div>
               ) : null}
@@ -354,7 +354,7 @@ function NumberInput({ group, value, onChange }: { group: Group; value: number; 
         </button>
       </div>
       <span className="text-[13px] text-muted">
-        {c.unit} · بین {formatNumber(min)} تا {formatNumber(max)}
+        {c.unit} • بین {formatNumber(min)} تا {formatNumber(max)}
       </span>
     </div>
   );

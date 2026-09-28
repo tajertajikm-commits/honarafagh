@@ -58,7 +58,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
                   <span className="font-bold">{t.name}</span>
                   <span className="text-muted">{t.title}</span>
                   <Status map={TASK_STATUS} value={t.status} />
-                  <span className="ms-auto text-muted">{t.assignee ?? "بدون مسئول"} · موعد <DateText value={t.due_date} /></span>
+                  <span className="ms-auto text-muted">{t.assignee ?? "بدون مسئول"} • موعد <DateText value={t.due_date} /></span>
                   <Button asChild size="xs" variant="secondary"><Link href="/panel/station">ایستگاه کار</Link></Button>
                 </li>
               ))}
@@ -85,8 +85,8 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
                       </div>
                       <p className="mt-0.5 truncate text-[13.5px] font-bold">{r.item.title} <span className="font-medium text-muted">× {formatNumber(r.item.quantity)}</span></p>
                       <p className="text-[12px] text-muted">
-                        {r.customerName} · {r.versions ? `${toFaDigits(r.versions)} نسخه` : "بدون فایل"}
-                        {r.designTask && <> · طراحی: {TASK_STATUS[r.designTask]?.[0]}{(r.designAttempt ?? 1) > 1 && ` (دور ${toFaDigits(r.designAttempt!)})`}</>}
+                        {r.customerName} • {r.versions ? `${toFaDigits(r.versions)} نسخه` : "بدون فایل"}
+                        {r.designTask && <> • طراحی: {TASK_STATUS[r.designTask]?.[0]}{(r.designAttempt ?? 1) > 1 && ` (دور ${toFaDigits(r.designAttempt!)})`}</>}
                       </p>
                     </Link>
                   </li>
@@ -97,8 +97,8 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
           {selected && (
             <Card>
               <CardHeader
-                title={<>سفارش {toFaDigits(selected.order.number)} · {selected.customerName}</>}
-                description={<>تیراژ {formatNumber(selected.item.quantity)} · {selected.designAssignee ? `طراح: ${selected.designAssignee}` : selected.item.needsDesign ? "طراح تعیین نشده" : "فایل از مشتری"} · موعد <DateText value={selected.order.dueDate} /></>}
+                title={<>سفارش {toFaDigits(selected.order.number)} • {selected.customerName}</>}
+                description={<>تیراژ {formatNumber(selected.item.quantity)} • {selected.designAssignee ? `طراح: ${selected.designAssignee}` : selected.item.needsDesign ? "طراح تعیین نشده" : "فایل از مشتری"} • موعد <DateText value={selected.order.dueDate} /></>}
                 actions={<Button asChild size="xs" variant="secondary"><Link href={`/panel/orders/${selected.order.id}`}>مشاهده سفارش</Link></Button>}
               />
               <CardBody className="pt-0">

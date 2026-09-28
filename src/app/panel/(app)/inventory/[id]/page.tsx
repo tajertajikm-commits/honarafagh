@@ -36,7 +36,7 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
       <PageHeader
         crumbs={[{ href: "/panel/inventory", label: "موجودی کالا" }]}
         title={m.name}
-        description={<><Code>{m.sku}</Code> · {d.categoryName}{d.supplierName && ` · تأمین‌کننده پیش‌فرض: ${d.supplierName}`}</>}
+        description={<><Code>{m.sku}</Code> • {d.categoryName}{d.supplierName && ` • تأمین‌کننده پیش‌فرض: ${d.supplierName}`}</>}
         actions={
           <>
             {perms.has("procurement.manage") && <MaterialRequestButton materials={[option]} preset={{ materialId: m.id, quantity: m.reorderQuantity || undefined }} />}
@@ -49,7 +49,7 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="موجودی فیزیکی" value={<>{formatNumber(onHand, { decimals: true })} <span className="text-[13px] text-muted">{unit}</span></>} />
         <Stat label="رزرو برای سفارش‌ها" value={formatNumber(reserved, { decimals: true })} />
-        <Stat label="موجودی آزاد" value={formatNumber(onHand - reserved, { decimals: true })} tone={onHand - reserved <= m.reorderPoint ? "warning" : "success"} sub={`نقطه سفارش ${formatNumber(m.reorderPoint)} · مقدار سفارش ${formatNumber(m.reorderQuantity)}`} />
+        <Stat label="موجودی آزاد" value={formatNumber(onHand - reserved, { decimals: true })} tone={onHand - reserved <= m.reorderPoint ? "warning" : "success"} sub={`نقطه سفارش ${formatNumber(m.reorderPoint)} • مقدار سفارش ${formatNumber(m.reorderQuantity)}`} />
         <Stat label="در راه" value={formatNumber(onOrder, { decimals: true })} tone={onOrder ? "info" : "neutral"} />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -134,7 +134,7 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
                 {d.incoming.map((x) => (
                   <div key={x.line.id} className="rounded-lg border border-line px-3 py-2">
                     <div className="flex items-center justify-between"><span className="font-bold">سفارش خرید {toFaDigits(x.po.number)}</span><Status map={PO_STATUS} value={x.po.status} /></div>
-                    <p className="mt-0.5 text-muted">{x.supplierName} · {formatNumber(x.line.receivedQuantity, { decimals: true })} از {formatNumber(x.line.quantity, { decimals: true })} رسیده · موعد <DateText value={x.po.expectedAt} /></p>
+                    <p className="mt-0.5 text-muted">{x.supplierName} • {formatNumber(x.line.receivedQuantity, { decimals: true })} از {formatNumber(x.line.quantity, { decimals: true })} رسیده • موعد <DateText value={x.po.expectedAt} /></p>
                   </div>
                 ))}
               </CardBody>

@@ -11,7 +11,7 @@ export interface TimelineStepView {
 
 const INKS = ["#FFF301", "#FDB913", "#F26422", "#ED1D26"];
 
-/** Customer progress line: ✓ done · ● current · ○ upcoming. */
+/** Customer progress line: ✓ done • ● current • ○ upcoming. */
 export function OrderTimeline({ steps, className }: { steps: TimelineStepView[]; className?: string }) {
   const doneCount = steps.filter((s) => s.state === "done").length;
   return (

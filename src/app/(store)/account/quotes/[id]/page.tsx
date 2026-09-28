@@ -23,7 +23,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-[20px] font-bold">پیش‌فاکتور {toFaDigits(q.number)}</h2>
-            <p className="text-[13px] text-muted">صدور: <DateText value={q.createdAt} /> · اعتبار تا <DateText value={q.validUntil} /></p>
+            <p className="text-[13px] text-muted">صدور: <DateText value={q.createdAt} /> • اعتبار تا <DateText value={q.validUntil} /></p>
           </div>
           <Status map={QUOTE_STATUS} value={expired && q.status === "SENT" ? "EXPIRED" : q.status} />
         </div>

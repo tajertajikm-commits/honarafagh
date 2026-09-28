@@ -55,7 +55,7 @@ async function buildQuoteItems(ctx: Ctx, customerId: string, urgency: UrgencyLev
       const price = await priceProduct(ctx.db, { productId: it.productId, quantity: it.quantity, selections: it.selections ?? {}, urgency, customerId });
       const overridden = it.lineSubtotal != null && it.lineSubtotal !== price.subtotal;
       if (overridden && !can(ctx, "order.price.override")) throw forbidden("تغییر قیمت محاسبه‌شده نیازمند مجوز است.");
-      out.push({ quoteId: "", productId: p.id, title: it.title ?? p.name, description: it.description ?? price.spec.summary.map((s) => `${s.group}: ${s.value}`).join(" · "), quantity: it.quantity, selections: it.selections ?? {}, priceSnapshot: price, pricingVersionId: price.ruleVersionId, lineSubtotal: it.lineSubtotal ?? price.subtotal, costTotal: price.costTotal, isPriceOverridden: overridden, sortOrder: i });
+      out.push({ quoteId: "", productId: p.id, title: it.title ?? p.name, description: it.description ?? price.spec.summary.map((s) => `${s.group}: ${s.value}`).join(" • "), quantity: it.quantity, selections: it.selections ?? {}, priceSnapshot: price, pricingVersionId: price.ruleVersionId, lineSubtotal: it.lineSubtotal ?? price.subtotal, costTotal: price.costTotal, isPriceOverridden: overridden, sortOrder: i });
     } else {
       if (!it.title || it.lineSubtotal == null) throw validation("برای ردیف سفارشی عنوان و مبلغ لازم است.");
       out.push({ quoteId: "", productId: null, title: it.title, description: it.description ?? null, quantity: it.quantity, selections: {}, priceSnapshot: null, lineSubtotal: it.lineSubtotal, costTotal: it.costTotal ?? 0, isPriceOverridden: true, sortOrder: i });

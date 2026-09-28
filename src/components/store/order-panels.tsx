@@ -83,7 +83,7 @@ export function ArtworkPanel({ itemId, fileStatus, needsDesign, canUpload, versi
             <li key={v.id} className="flex items-center gap-2 rounded-lg bg-surface-2/60 px-3 py-2 text-[12.5px]">
               <span className="font-bold tabular">نسخه {toFaDigits(v.versionNo)}</span>
               <span className="text-muted">{ARTWORK_STAGE[v.stage]}</span>
-              <span className="min-w-0 flex-1 truncate text-muted" dir="auto">{v.file.originalName} · {formatBytes(v.file.sizeBytes)}</span>
+              <span className="min-w-0 flex-1 truncate text-muted" dir="auto">{v.file.originalName} • {formatBytes(v.file.sizeBytes)}</span>
               <span className="text-ink-2">{v.statusLabel}</span>
               <a href={`/api/v1/files/${v.file.id}`} className="text-muted hover:text-ink" aria-label="دانلود"><Download className="size-3.5" /></a>
             </li>

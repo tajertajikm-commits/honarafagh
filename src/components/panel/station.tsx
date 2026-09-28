@@ -91,7 +91,7 @@ export function Station({ queue, detail, basePath, emptyTitle = "کاری در �
                     </span>
                     <Status map={TASK_STATUS} value={q.status} />
                   </div>
-                  <p className="mt-1 text-[12.5px] text-ink-2">سفارش {toFaDigits(q.orderNumber)} · {q.itemTitle} · {formatNumber(q.itemQuantity)} {q.itemUnit}</p>
+                  <p className="mt-1 text-[12.5px] text-ink-2">سفارش {toFaDigits(q.orderNumber)} • {q.itemTitle} • {formatNumber(q.itemQuantity)} {q.itemUnit}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11.5px] text-muted">
                     {q.orderPriority !== "NORMAL" && <Status map={PRIORITY} value={q.orderPriority} />}
                     {q.dueDate && <span>موعد <DateText value={q.dueDate} /></span>}
@@ -137,10 +137,10 @@ function TaskView({ d }: { d: StationDetail }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[13px] text-muted">
-                <Link href={`/panel/orders/${d.orderId}`} className="font-bold hover:text-accent-ink">سفارش {toFaDigits(d.orderNumber)}</Link> · {d.customerName}
+                <Link href={`/panel/orders/${d.orderId}`} className="font-bold hover:text-accent-ink">سفارش {toFaDigits(d.orderNumber)}</Link> • {d.customerName}
               </p>
               <h2 className="mt-1 text-[26px] font-bold leading-tight">{d.name}</h2>
-              <p className="mt-1 text-[15px] text-ink-2">{d.itemTitle} · <b className="tabular">{formatNumber(d.quantityPlanned)}</b> {d.unit}{d.attempt > 1 && <Badge tone="danger" className="ms-2">دوباره‌کاری — اجرای {toFaDigits(d.attempt)}</Badge>}</p>
+              <p className="mt-1 text-[15px] text-ink-2">{d.itemTitle} • <b className="tabular">{formatNumber(d.quantityPlanned)}</b> {d.unit}{d.attempt > 1 && <Badge tone="danger" className="ms-2">دوباره‌کاری — اجرای {toFaDigits(d.attempt)}</Badge>}</p>
               {d.reworkReason && d.attempt > 1 && <p className="mt-1 text-[13px] text-danger">علت: {d.reworkReason}</p>}
             </div>
             <div className="text-end">
@@ -197,7 +197,7 @@ function TaskView({ d }: { d: StationDetail }) {
                   {d.spec.impositions.map((im) => (
                     <div key={im.component} className="rounded-xl bg-surface-2/60 px-4 py-3 text-[13px]">
                       <p className="font-bold">{im.name} — {toFaDigits(im.colorsFront)}/{toFaDigits(im.colorsBack)} رنگ</p>
-                      <p className="mt-1 text-ink-2">{toFaDigits(im.ups)} عدد در هر برگ · {toFaDigits(im.forms)} فرم · <b>{formatNumber(im.runSheets)}</b> برگ چاپ + {formatNumber(im.wasteSheets)} برگ ضایعات مجاز{im.plates ? ` · ${toFaDigits(im.plates)} زینک` : ""}</p>
+                      <p className="mt-1 text-ink-2">{toFaDigits(im.ups)} عدد در هر برگ • {toFaDigits(im.forms)} فرم • <b>{formatNumber(im.runSheets)}</b> برگ چاپ + {formatNumber(im.wasteSheets)} برگ ضایعات مجاز{im.plates ? ` • ${toFaDigits(im.plates)} زینک` : ""}</p>
                     </div>
                   ))}
                 </div>
@@ -244,7 +244,7 @@ function TaskView({ d }: { d: StationDetail }) {
               <CardHeader title="سابقه" />
               <CardBody className="space-y-1.5 pt-0 text-[12.5px]">
                 {d.events.slice(0, 8).map((e) => (
-                  <p key={e.id} className="text-muted"><span className="text-ink-2">{EVENT[e.type] ?? e.type}</span>{e.note ? ` — ${e.note}` : ""} · {e.actor ?? "سیستم"} · <DateText value={e.createdAt} relative /></p>
+                  <p key={e.id} className="text-muted"><span className="text-ink-2">{EVENT[e.type] ?? e.type}</span>{e.note ? ` — ${e.note}` : ""} • {e.actor ?? "سیستم"} • <DateText value={e.createdAt} relative /></p>
                 ))}
               </CardBody>
             </Card>
@@ -289,7 +289,7 @@ function CompleteDialog({ d, open, onClose }: { d: StationDetail; open: boolean;
             const left = r.issued - r.consumed - r.wasted - r.returned;
             return (
               <div key={r.id} className="rounded-xl border border-line p-3">
-                <p className="text-[13px] font-bold">{r.name} <span className="font-medium text-muted">· {formatNumber(left)} {UNIT[r.unit]} در دست</span></p>
+                <p className="text-[13px] font-bold">{r.name} <span className="font-medium text-muted">• {formatNumber(left)} {UNIT[r.unit]} در دست</span></p>
                 <div className="mt-2 grid grid-cols-2 gap-3">
                   <Field label="مصرف"><Input ltr inputMode="decimal" value={use[r.id]?.consumed ?? ""} onChange={(e) => setUse({ ...use, [r.id]: { ...use[r.id]!, consumed: toEnDigits(e.target.value).replace(/[^\d.]/g, "") } })} /></Field>
                   <Field label="ضایعات"><Input ltr inputMode="decimal" value={use[r.id]?.wasted ?? ""} onChange={(e) => setUse({ ...use, [r.id]: { ...use[r.id]!, wasted: toEnDigits(e.target.value).replace(/[^\d.]/g, "") } })} /></Field>
@@ -348,7 +348,7 @@ function InspectionDialog({ d, open, onClose }: { d: StationDetail; open: boolea
   }), result === "PASSED" ? "کیفیت تأیید شد." : "رد شد و کار به دوباره‌کاری رفت.").then((ok) => ok && onClose());
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent wide title={`بازرسی «${d.name}»`} description={`${d.itemTitle} · ${formatNumber(d.quantityPlanned)} ${d.unit}`} footer={
+      <DialogContent wide title={`بازرسی «${d.name}»`} description={`${d.itemTitle} • ${formatNumber(d.quantityPlanned)} ${d.unit}`} footer={
         <>
           <Button variant="danger" loading={pending} disabled={!target} onClick={() => submit("FAILED")}>رد و ارسال به دوباره‌کاری</Button>
           <Button variant="accent" loading={pending} onClick={() => submit("PASSED")}>{allPass ? "تأیید کیفیت" : "تأیید با وجود ایراد جزئی"}</Button>

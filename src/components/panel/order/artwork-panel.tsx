@@ -55,12 +55,12 @@ export function ArtworkPanel({ items, versions, perms }: { items: { id: string; 
                     <span className="font-bold">نسخه {toFaDigits(v.versionNo)}</span>
                     <Badge>{ARTWORK_STAGE[v.stage]}</Badge>
                     <Status map={ARTWORK_STATUS} value={v.status} />
-                    <span className="min-w-0 flex-1 truncate text-muted" dir="auto">{v.file.originalName} · {formatBytes(v.file.sizeBytes)} · {v.uploader ?? "—"} · <DateText value={v.createdAt} relative /></span>
+                    <span className="min-w-0 flex-1 truncate text-muted" dir="auto">{v.file.originalName} • {formatBytes(v.file.sizeBytes)} • {v.uploader ?? "—"} • <DateText value={v.createdAt} relative /></span>
                     {(v.file.mimeType.startsWith("image/") || v.file.mimeType === "application/pdf") && <a href={`/api/v1/files/${v.file.id}?inline=1`} target="_blank" rel="noreferrer" className="grid size-7 place-items-center rounded-md hover:bg-surface-2" aria-label="نمایش"><Eye className="size-4" /></a>}
                     <a href={`/api/v1/files/${v.file.id}`} className="grid size-7 place-items-center rounded-md hover:bg-surface-2" aria-label="دانلود"><Download className="size-4" /></a>
                   </div>
                   {(v.note || v.reviewNote || v.customerComment) && (
-                    <p className="mt-1.5 text-[12px] text-muted">{[v.note, v.reviewNote && `بازبینی: ${v.reviewNote}`, v.customerComment && `مشتری: ${v.customerComment}`].filter(Boolean).join(" · ")}</p>
+                    <p className="mt-1.5 text-[12px] text-muted">{[v.note, v.reviewNote && `بازبینی: ${v.reviewNote}`, v.customerComment && `مشتری: ${v.customerComment}`].filter(Boolean).join(" • ")}</p>
                   )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {can("file.review") && ["UPLOADED", "CUSTOMER_APPROVED"].includes(v.status) && (

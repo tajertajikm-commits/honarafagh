@@ -49,7 +49,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
             <TD className="tabular text-muted">{formatNumber(p.number).replace(/٬/g, "")}</TD>
             <TD><Link href={`/panel/orders/${p.orderId}`} className="hover:text-accent-ink"><OrderNo n={orderNumber} /></Link></TD>
             <TD>{customerName}</TD>
-            <TD>{p.kind === "REFUND" ? <Badge tone="warning">بازپرداخت · {PAYMENT_METHOD[p.method]}</Badge> : PAYMENT_METHOD[p.method]}</TD>
+            <TD>{p.kind === "REFUND" ? <Badge tone="warning">بازپرداخت • {PAYMENT_METHOD[p.method]}</Badge> : PAYMENT_METHOD[p.method]}</TD>
             <TD className="text-end"><Money rial={p.amount} strong /></TD>
             <TD className="text-[12.5px]">
               {p.reference || p.providerRefId ? <Code>{p.reference ?? p.providerRefId}</Code> : "—"}
@@ -71,7 +71,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="دریافت امروز" value={<Money rial={summary.today} />} sub={<>۳۰ روز اخیر: <Money rial={summary.last30} /></>} icon={<CircleDollarSign />} />
         <Stat label="در انتظار تأیید" value={formatNumber(summary.pendingCount)} sub={<Money rial={summary.pendingAmount} />} tone={summary.pendingCount ? "accent" : "neutral"} icon={<Clock />} href="/panel/accounting?tab=approvals" />
-        <Stat label="مانده مطالبات" value={<Money rial={summary.outstanding} />} sub={`${formatNumber(summary.outstandingCount)} سفارش · ${formatNumber(readyBlocked.length)} آماده تحویل`} tone={readyBlocked.length ? "warning" : "neutral"} icon={<Wallet />} href="/panel/accounting?tab=receivables" />
+        <Stat label="مانده مطالبات" value={<Money rial={summary.outstanding} />} sub={`${formatNumber(summary.outstandingCount)} سفارش • ${formatNumber(readyBlocked.length)} آماده تحویل`} tone={readyBlocked.length ? "warning" : "neutral"} icon={<Wallet />} href="/panel/accounting?tab=receivables" />
         <Stat label="بازپرداخت معوق" value={formatNumber(refunds.length)} sub={<>بازپرداخت ۳۰ روز: <Money rial={summary.refunds30} /></>} tone={refunds.length ? "danger" : "neutral"} icon={<RotateCcw />} href="/panel/accounting?tab=refunds" />
       </div>
 
@@ -140,7 +140,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
             <CardBody className="space-y-2 pt-0">
               {readyBlocked.length === 0 ? <p className="text-[13px] text-muted">موردی نیست.</p> : readyBlocked.map((r) => (
                 <Link key={r.id} href={`/panel/orders/${r.id}`} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[12.5px] hover:border-line-strong">
-                  <span><OrderNo n={r.number} /> · {r.customerName}</span>
+                  <span><OrderNo n={r.number} /> • {r.customerName}</span>
                   <Money rial={r.balance} strong />
                 </Link>
               ))}

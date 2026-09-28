@@ -44,7 +44,7 @@ export default async function AccountQuotes() {
           <ul className="space-y-2">
             {inq.map((i) => (
               <li key={i.id} className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 text-[13.5px]">
-                <span>{i.title} <span className="text-muted">· <DateText value={i.createdAt} /></span></span>
+                <span>{i.title} <span className="text-muted">• <DateText value={i.createdAt} /></span></span>
                 <Status map={INQUIRY_STATUS} value={i.status} />
               </li>
             ))}

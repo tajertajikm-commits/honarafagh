@@ -35,9 +35,9 @@ export function DeliveryPanel({ orderId, shipments, shippable, methods, couriers
                 <span className="ms-auto"><Status map={SHIPMENT_STATUS} value={s.status} /></span>
               </div>
               <p className="mt-1 text-muted">
-                {[s.assigneeName, s.vehicleName, s.trackingCode && `رهگیری ${s.trackingCode}`, s.recipientName && s.status === "DELIVERED" && `تحویل به ${s.recipientName}`].filter(Boolean).join(" · ")}
-                {s.deliveredAt && <> · <DateText value={s.deliveredAt} withTime /></>}
-                {s.proofFileId && <> · <a className="font-bold text-accent-ink" target="_blank" rel="noreferrer" href={`/api/v1/files/${s.proofFileId}?inline=1`}>مدرک تحویل</a></>}
+                {[s.assigneeName, s.vehicleName, s.trackingCode && `رهگیری ${s.trackingCode}`, s.recipientName && s.status === "DELIVERED" && `تحویل به ${s.recipientName}`].filter(Boolean).join(" • ")}
+                {s.deliveredAt && <> • <DateText value={s.deliveredAt} withTime /></>}
+                {s.proofFileId && <> • <a className="font-bold text-accent-ink" target="_blank" rel="noreferrer" href={`/api/v1/files/${s.proofFileId}?inline=1`}>مدرک تحویل</a></>}
               </p>
               {s.failureReason && <p className="text-danger">{s.failureReason}</p>}
               <div className="mt-2"><ShipmentActions s={s} perms={perms} couriers={couriers} /></div>

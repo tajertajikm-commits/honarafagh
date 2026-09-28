@@ -87,9 +87,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                     <span className="tabular text-muted">{toFaDigits(i.number)}</span>
                     <span className="font-bold">{i.title}</span>
                     <Status map={INQUIRY_STATUS} value={i.status} />
-                    <span className="ms-auto text-[12.5px] text-muted"><DateText value={i.createdAt} relative />{assignee && ` · ${assignee}`}</span>
+                    <span className="ms-auto text-[12.5px] text-muted"><DateText value={i.createdAt} relative />{assignee && ` • ${assignee}`}</span>
                   </div>
-                  <p className="mt-1 text-[12.5px] text-muted">{customerName}{companyName && ` · ${companyName}`} · <Code>{formatPhone(customerPhone)}</Code>{productName && ` · ${productName}`}{i.quantity && ` · تیراژ ${formatNumber(i.quantity)}`}{i.deadline && <> · مهلت <DateText value={i.deadline} /></>}</p>
+                  <p className="mt-1 text-[12.5px] text-muted">{customerName}{companyName && ` • ${companyName}`} • <Code>{formatPhone(customerPhone)}</Code>{productName && ` • ${productName}`}{i.quantity && ` • تیراژ ${formatNumber(i.quantity)}`}{i.deadline && <> • مهلت <DateText value={i.deadline} /></>}</p>
                   <p className="mt-2 max-w-3xl whitespace-pre-line text-[13.5px] leading-7 text-ink-2">{i.description}</p>
                   {canManage && (
                     <div className="mt-3 flex flex-wrap gap-2">

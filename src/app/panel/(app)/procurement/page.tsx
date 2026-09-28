@@ -95,10 +95,10 @@ export default async function ProcurementPage({ searchParams }: { searchParams: 
                   <li key={po.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold">سفارش خرید {toFaDigits(po.number)}</span>
-                      <span className="text-muted">· {supplierName}</span>
+                      <span className="text-muted">• {supplierName}</span>
                       <Status map={PO_STATUS} value={po.status} />
                       {late && <Badge tone="danger">تأخیر</Badge>}
-                      <span className="text-[12.5px] text-muted">· رسیدن: <DateText value={po.expectedAt} /></span>
+                      <span className="text-[12.5px] text-muted">• رسیدن: <DateText value={po.expectedAt} /></span>
                       <span className="ms-auto flex items-center gap-2">
                         <Money rial={po.totalAmount} strong />
                         {canManage && po.status === "DRAFT" && <ActionButton size="xs" path={`procurement/purchase-orders/${po.id}/submit`} success="سفارش خرید ارسال شد.">ثبت و ارسال</ActionButton>}

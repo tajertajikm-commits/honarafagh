@@ -55,7 +55,7 @@ export function MaterialsPanel({ reqs, perms, compact }: { reqs: RequirementView
             return (
               <TR key={r.id}>
                 <TD><span className="font-bold">{r.material.name}</span><span className="block text-[11.5px] text-muted"><bdi dir="ltr">{r.material.sku}</bdi></span></TD>
-                {!compact && <TD className="text-muted">{PURPOSE[r.purpose]}{r.component ? ` · ${r.component}` : ""}</TD>}
+                {!compact && <TD className="text-muted">{PURPOSE[r.purpose]}{r.component ? ` • ${r.component}` : ""}</TD>}
                 <TD className="text-end tabular">{formatNumber(r.required, { decimals: true })} <span className="text-[11px] text-muted">{unit}</span></TD>
                 <TD className="text-end tabular">{formatNumber(r.reserved, { decimals: true })}</TD>
                 <TD className="text-end tabular">{formatNumber(r.issued, { decimals: true })}</TD>
@@ -76,7 +76,7 @@ export function MaterialsPanel({ reqs, perms, compact }: { reqs: RequirementView
         {issue && (
           <DialogContent
             title={`حواله ${issue.material.name}`}
-            description={`رزرو شده: ${formatNumber(issue.reserved)} · باقیمانده نیاز: ${formatNumber(Math.max(0, issue.required - issue.issued))}. مقدار بیش از رزرو از موجودی آزاد کسر می‌شود.`}
+            description={`رزرو شده: ${formatNumber(issue.reserved)} • باقیمانده نیاز: ${formatNumber(Math.max(0, issue.required - issue.issued))}. مقدار بیش از رزرو از موجودی آزاد کسر می‌شود.`}
             footer={<Button loading={pending} onClick={async () => { if (await run(() => api(`inventory/requirements/${issue.id}/issue`, { body: { quantity: Number(toEnDigits(qty)), idempotencyKey: newIdempotencyKey() } }), "حواله ثبت شد.")) setIssue(null); }}>ثبت حواله</Button>}
           >
             <Field label={`مقدار (${UNIT[issue.material.unit] ?? issue.material.unit})`}><Input ltr inputMode="decimal" value={qty} onChange={(e) => setQty(toEnDigits(e.target.value).replace(/[^\d.]/g, ""))} autoFocus /></Field>

@@ -43,7 +43,7 @@ export async function globalSearch(ctx: Ctx, raw: string): Promise<SearchHit[]> 
     if (phone) conds.push(eq(customers.phone, phone));
     else if (digits.length >= 4) conds.push(ilike(customers.phone, `%${digits}%`));
     const rows = await ctx.db.select().from(customers).where(or(...conds)).limit(5);
-    hits.push(...rows.map((r) => ({ kind: "customer" as const, id: r.id, title: r.fullName || r.phone, subtitle: [r.companyName, r.phone].filter(Boolean).join(" · "), href: `/panel/customers/${r.id}` })));
+    hits.push(...rows.map((r) => ({ kind: "customer" as const, id: r.id, title: r.fullName || r.phone, subtitle: [r.companyName, r.phone].filter(Boolean).join(" • "), href: `/panel/customers/${r.id}` })));
   }
   const productRows = await ctx.db.select({ id: products.id, name: products.name, slug: products.slug }).from(products).where(ilike(products.name, like)).limit(4);
   hits.push(...productRows.map((r) => ({ kind: "product" as const, id: r.id, title: r.name, subtitle: "محصول", href: can(ctx, "catalog.manage") ? `/panel/catalog/${r.id}` : `/p/${r.slug}` })));
@@ -54,7 +54,7 @@ export async function globalSearch(ctx: Ctx, raw: string): Promise<SearchHit[]> 
       .innerJoin(users, eq(users.id, employees.userId))
       .where(or(ilike(users.fullName, like), ilike(employees.personnelCode, like), phone ? eq(users.phone, phone) : undefined))
       .limit(4);
-    hits.push(...rows.map((r) => ({ kind: "employee" as const, id: r.id, title: r.name, subtitle: [r.title, r.code].filter(Boolean).join(" · "), href: `/panel/employees/${r.id}` })));
+    hits.push(...rows.map((r) => ({ kind: "employee" as const, id: r.id, title: r.name, subtitle: [r.title, r.code].filter(Boolean).join(" • "), href: `/panel/employees/${r.id}` })));
   }
   if (can(ctx, "inventory.view")) {
     const rows = await ctx.db.select({ id: materials.id, name: materials.name, sku: materials.sku }).from(materials).where(and(or(ilike(materials.name, like), ilike(materials.sku, `%${q.toUpperCase()}%`)))).limit(5);

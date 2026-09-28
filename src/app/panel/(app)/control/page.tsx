@@ -33,7 +33,7 @@ export default async function ControlCenter() {
     <>
       <PageHeader
         title="مرکز کنترل"
-        description={<>{formatWeekday(new Date())} · برنامه تولید {formatTime(d.scheduleAt)} به‌روز شد</>}
+        description={<>{formatWeekday(new Date())} • برنامه تولید {formatTime(d.scheduleAt)} به‌روز شد</>}
         actions={
           <>
             <Button asChild variant="secondary" size="sm"><Link href="/panel/production">تابلوی تولید</Link></Button>
@@ -95,8 +95,8 @@ export default async function ControlCenter() {
                   <div className="mt-2.5 min-h-[36px] text-[12px]">
                     {m.current ? (
                       <Link href={`/panel/orders/${m.current.orderId}`} className="block hover:text-accent-ink">
-                        <span className="font-bold">{m.current.name}</span> · سفارش {formatNumber(m.current.orderNumber)}
-                        <span className="block text-muted">{m.current.operator ?? "—"}{m.current.startedAt && ` · از ${formatTime(m.current.startedAt)}`}</span>
+                        <span className="font-bold">{m.current.name}</span> • سفارش {formatNumber(m.current.orderNumber)}
+                        <span className="block text-muted">{m.current.operator ?? "—"}{m.current.startedAt && ` • از ${formatTime(m.current.startedAt)}`}</span>
                       </Link>
                     ) : m.maintenance ? (
                       <span className="text-warning">تعمیر: {m.maintenance.title} ({formatShortDate(m.maintenance.scheduledStart)})</span>
@@ -126,7 +126,7 @@ export default async function ControlCenter() {
                   <Link key={s.code} href={`/panel/production?step=${s.code}`} className={cn("min-w-[124px] rounded-xl border p-3 transition-colors hover:border-line-strong", d.bottleneck?.code === s.code ? "border-accent/50 bg-accent-soft/50" : "border-line")}>
                     <p className="truncate text-[12.5px] font-bold">{s.name}</p>
                     <p className="mt-1 text-[22px] font-bold leading-none tabular">{formatNumber(s.ready + s.active + s.blocked)}</p>
-                    <p className="mt-1.5 text-[11px] text-muted">{formatNumber(s.active)} در حال انجام · {formatNumber(s.ready)} آماده</p>
+                    <p className="mt-1.5 text-[11px] text-muted">{formatNumber(s.active)} در حال انجام • {formatNumber(s.ready)} آماده</p>
                     {s.blocked > 0 && <p className="text-[11px] font-bold text-danger">{formatNumber(s.blocked)} مسدود</p>}
                   </Link>
                 ))}
@@ -154,7 +154,7 @@ export default async function ControlCenter() {
                         <span className="shrink-0 text-end text-[12px]">
                           <Status map={ORDER_STATUS} value={o.status} />
                           <span className={cn("mt-1 block", isLate ? "font-bold text-danger" : risk ? "font-bold text-warning" : "text-muted")}>
-                            {o.dueDate ? <DateText value={o.dueDate} /> : "بدون موعد"}{risk && " · در خطر"}
+                            {o.dueDate ? <DateText value={o.dueDate} /> : "بدون موعد"}{risk && " • در خطر"}
                           </span>
                         </span>
                       </Link>
@@ -179,7 +179,7 @@ export default async function ControlCenter() {
                 <ul className="space-y-2">
                   {d.shipments.map((s) => (
                     <li key={s.id} className="flex items-center justify-between gap-2 text-[13px]">
-                      <Link href={`/panel/orders/${s.orderId}`} className="truncate hover:text-accent-ink">سفارش {formatNumber(s.number)} · {s.customer}</Link>
+                      <Link href={`/panel/orders/${s.orderId}`} className="truncate hover:text-accent-ink">سفارش {formatNumber(s.number)} • {s.customer}</Link>
                       <Status map={SHIPMENT_STATUS} value={s.status} />
                     </li>
                   ))}
@@ -191,7 +191,7 @@ export default async function ControlCenter() {
           <Card>
             <CardHeader title="بار کاری کارکنان" icon={<Users />} />
             <CardBody className="pt-0">
-              <BarList data={d.workload.map((w) => ({ label: w.name, value: w.minutes, display: formatDuration(w.minutes) || "—", hint: `${formatNumber(w.active)} در حال انجام · ${formatNumber(w.queued)} در صف` }))} empty="کاری به کسی سپرده نشده است." />
+              <BarList data={d.workload.map((w) => ({ label: w.name, value: w.minutes, display: formatDuration(w.minutes) || "—", hint: `${formatNumber(w.active)} در حال انجام • ${formatNumber(w.queued)} در صف` }))} empty="کاری به کسی سپرده نشده است." />
             </CardBody>
           </Card>
         </div>

@@ -134,7 +134,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
                       <li key={po.id} className="px-5 py-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold">سفارش خرید {toFaDigits(po.number)}</span>
-                          <span className="text-muted">· {supplierName}</span>
+                          <span className="text-muted">• {supplierName}</span>
                           <Status map={PO_STATUS} value={po.status} />
                           {late && <Badge tone="warning">تأخیر در رسیدن</Badge>}
                           <span className="ms-auto flex items-center gap-2 text-[12.5px] text-muted">موعد رسیدن: <DateText value={po.expectedAt} /></span>

@@ -31,7 +31,7 @@ export default async function AccountOrders({ searchParams }: { searchParams: Pr
                   <div>
                     <p className="text-[15px] font-bold">سفارش <OrderNo n={o.number} /></p>
                     <p className="mt-0.5 text-[13px] text-muted">
-                      <DateText value={o.placedAt} /> · {items.map((i) => `${i.title} (${formatNumber(i.quantity)})`).join("، ")}
+                      <DateText value={o.placedAt} /> • {items.map((i) => `${i.title} (${formatNumber(i.quantity)})`).join("، ")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

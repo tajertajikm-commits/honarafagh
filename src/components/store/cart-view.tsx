@@ -65,8 +65,8 @@ export function CartView({ initial, loggedIn }: { initial: CartSummary; loggedIn
               <div className="min-w-0">
                 <Link href={`/p/${l.product.slug}`} className="text-[16px] font-bold hover:text-accent-ink">{l.product.name}</Link>
                 <p className="mt-0.5 text-[13px] text-muted">
-                  {formatNumber(l.quantity)} {l.product.unitLabel} · {URGENCY[l.urgency]}
-                  {l.leadDays ? ` · حدود ${formatNumber(l.leadDays)} روز کاری` : ""}
+                  {formatNumber(l.quantity)} {l.product.unitLabel} • {URGENCY[l.urgency]}
+                  {l.leadDays ? ` • حدود ${formatNumber(l.leadDays)} روز کاری` : ""}
                 </p>
               </div>
               <div className="text-left">
@@ -74,7 +74,7 @@ export function CartView({ initial, loggedIn }: { initial: CartSummary; loggedIn
               </div>
             </div>
             {l.summary.length > 0 && (
-              <p className="mt-3 text-[12.5px] leading-6 text-muted">{l.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" · ")}</p>
+              <p className="mt-3 text-[12.5px] leading-6 text-muted">{l.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" • ")}</p>
             )}
             {l.priceChanged && (
               <p className="mt-3 flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[12.5px] text-warning">

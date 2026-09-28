@@ -45,20 +45,20 @@ export default async function ShippingPage({ searchParams }: { searchParams: Pro
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/panel/orders/${s.orderId}`} className="hover:text-accent-ink"><OrderNo n={row.orderNumber} /></Link>
           <span className="font-bold">{row.customerName}</span>
-          <span className="text-[12.5px] text-muted">· {row.methodName}</span>
+          <span className="text-[12.5px] text-muted">• {row.methodName}</span>
           <Status map={SHIPMENT_STATUS} value={s.status} />
-          <span className="ms-auto text-[12.5px] text-muted">{row.assigneeName ? `پیک: ${row.assigneeName}` : row.methodKind === "INTERNAL" ? "پیک تعیین نشده" : ""}{row.vehicleName ? ` · ${row.vehicleName}` : ""}</span>
+          <span className="ms-auto text-[12.5px] text-muted">{row.assigneeName ? `پیک: ${row.assigneeName}` : row.methodKind === "INTERNAL" ? "پیک تعیین نشده" : ""}{row.vehicleName ? ` • ${row.vehicleName}` : ""}</span>
         </div>
         <p className="mt-1.5 text-[12.5px] text-ink-2">{row.lines.map((l) => `${l.title} × ${formatNumber(l.quantity)}`).join("، ")}</p>
         {addr && (
           <p className="mt-1 flex items-start gap-1.5 text-[12.5px] text-muted">
             <MapPin className="mt-1 size-3.5 shrink-0" />
-            <span>{addr.city}، {addr.line} · {addr.recipientName} <Code>{formatPhone(addr.recipientPhone)}</Code></span>
+            <span>{addr.city}، {addr.line} • {addr.recipientName} <Code>{formatPhone(addr.recipientPhone)}</Code></span>
           </p>
         )}
-        {s.trackingCode && <p className="mt-1 text-[12.5px] text-muted">رهگیری: <Code>{s.trackingCode}</Code>{s.externalProvider && ` · ${s.externalProvider}`}</p>}
+        {s.trackingCode && <p className="mt-1 text-[12.5px] text-muted">رهگیری: <Code>{s.trackingCode}</Code>{s.externalProvider && ` • ${s.externalProvider}`}</p>}
         {s.failureReason && <p className="mt-1 text-[12.5px] text-danger">{s.failureReason}</p>}
-        {s.status === "DELIVERED" && <p className="mt-1 text-[12.5px] text-success">تحویل به {s.recipientName} · <DateText value={s.deliveredAt} withTime />{s.proofFileId && <> · <a className="font-bold text-accent-ink" target="_blank" rel="noreferrer" href={`/api/v1/files/${s.proofFileId}?inline=1`}>مدرک تحویل</a></>}</p>}
+        {s.status === "DELIVERED" && <p className="mt-1 text-[12.5px] text-success">تحویل به {s.recipientName} • <DateText value={s.deliveredAt} withTime />{s.proofFileId && <> • <a className="font-bold text-accent-ink" target="_blank" rel="noreferrer" href={`/api/v1/files/${s.proofFileId}?inline=1`}>مدرک تحویل</a></>}</p>}
         <div className="mt-2.5"><ShipmentActions s={{ id: s.id, status: s.status, methodKind: row.methodKind, recipientName: s.recipientName, assigneeId: s.assigneeId }} perms={perms} couriers={couriers} /></div>
       </li>
     );
@@ -94,8 +94,8 @@ export default async function ShippingPage({ searchParams }: { searchParams: Pro
                       <p className="mt-1 text-[12.5px] text-ink-2">{r.lines.map((l) => `${l.title} × ${formatNumber(l.remaining)}`).join("، ")}</p>
                       <p className="mt-1 text-[12.5px] text-muted">
                         {method?.name ?? "روش ارسال انتخاب نشده"}
-                        {r.order.shippingAddress && ` · ${r.order.shippingAddress.city}`}
-                        {r.order.readyAt && <> · آماده از <DateText value={r.order.readyAt} relative /></>}
+                        {r.order.shippingAddress && ` • ${r.order.shippingAddress.city}`}
+                        {r.order.readyAt && <> • آماده از <DateText value={r.order.readyAt} relative /></>}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

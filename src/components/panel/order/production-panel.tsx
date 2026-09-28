@@ -66,7 +66,7 @@ export function ProductionPanel({ jobs, perms, employees, machines }: { jobs: Jo
         return (
           <div key={job.id}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13.5px] font-bold">{job.itemTitle} <span className="font-medium text-muted">· کار {toFaDigits(job.number)} · چاپ {METHOD[job.method] ?? job.method} · {formatNumber(done)} از {formatNumber(current.length)} مرحله</span></p>
+              <p className="text-[13.5px] font-bold">{job.itemTitle} <span className="font-medium text-muted">• کار {toFaDigits(job.number)} • چاپ {METHOD[job.method] ?? job.method} • {formatNumber(done)} از {formatNumber(current.length)} مرحله</span></p>
               {can("production.assign") && <Button size="xs" variant="ghost" onClick={() => { setPrio(String(job.priority)); setDialog({ kind: "priority", job }); }}>اولویت {toFaDigits(job.priority)}</Button>}
             </div>
             <ol className="overflow-hidden rounded-xl border border-line">
@@ -83,7 +83,7 @@ export function ProductionPanel({ jobs, perms, employees, machines }: { jobs: Jo
                     <div className="flex w-full flex-wrap items-center gap-3 text-[12px] text-muted sm:w-auto">
                       {t.isGate && t.status !== "COMPLETED" && t.status !== "SKIPPED" && t.gateKind && <span className="text-warning">{GATE_HINT[t.gateKind]}</span>}
                       {waitingLag && <span className="flex items-center gap-1 text-warning"><Clock className="size-3.5" /> قابل شروع از {formatTime(t.earliestStartAt)}</span>}
-                      {!t.isGate && <span>{t.assigneeName ?? "بدون مسئول"}{t.machineName ? ` · ${t.machineName}` : ""}</span>}
+                      {!t.isGate && <span>{t.assigneeName ?? "بدون مسئول"}{t.machineName ? ` • ${t.machineName}` : ""}</span>}
                       {!t.isGate && <span className="tabular">{t.actualMinutes ? `${formatDuration(t.actualMinutes)} / ` : ""}{formatDuration(t.estimatedMinutes)}</span>}
                       {t.quantityPlanned !== job.tasks[0]?.quantityPlanned && t.attempt > 1 && <span>تعداد: {formatNumber(t.quantityPlanned)}</span>}
                       <Status map={TASK_STATUS} value={t.status} />
@@ -111,7 +111,7 @@ export function ProductionPanel({ jobs, perms, employees, machines }: { jobs: Jo
               <details className="mt-2 text-[12px] text-muted">
                 <summary className="cursor-pointer">{formatNumber(history.length)} اجرای قبلی (پیش از دوباره‌کاری)</summary>
                 <ul className="mt-1.5 space-y-1 ps-4">
-                  {history.map((h) => <li key={h.id}>{h.name} · اجرای {toFaDigits(h.attempt)} · {TASK_STATUS[h.status]?.[0]} {h.assigneeName ? `· ${h.assigneeName}` : ""}</li>)}
+                  {history.map((h) => <li key={h.id}>{h.name} • اجرای {toFaDigits(h.attempt)} • {TASK_STATUS[h.status]?.[0]} {h.assigneeName ? `• ${h.assigneeName}` : ""}</li>)}
                 </ul>
               </details>
             )}

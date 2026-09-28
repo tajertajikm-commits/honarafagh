@@ -79,7 +79,7 @@ export function IssueButton({ req }: { req: { id: string; materialName: string; 
       <Dialog open={d.open} onOpenChange={d.setOpen}>
         <DialogContent
           title={`حواله ${req.materialName}`}
-          description={`رزروشده برای این سفارش: ${formatNumber(req.reserved, { decimals: true })} · باقی‌مانده نیاز: ${formatNumber(req.remaining, { decimals: true })} ${unitOf(req.unit)}. مقدار بیش از رزرو از موجودی آزاد کسر می‌شود.`}
+          description={`رزروشده برای این سفارش: ${formatNumber(req.reserved, { decimals: true })} • باقی‌مانده نیاز: ${formatNumber(req.remaining, { decimals: true })} ${unitOf(req.unit)}. مقدار بیش از رزرو از موجودی آزاد کسر می‌شود.`}
           footer={<Button loading={pending} disabled={num(qty) <= 0} onClick={async () => { if (await run(() => api(`inventory/requirements/${req.id}/issue`, { body: { quantity: num(qty), idempotencyKey: d.key.current } }), "حواله ثبت شد و از موجودی کسر شد.")) d.setOpen(false); }}>ثبت حواله</Button>}
         >
           <Field label={`مقدار (${unitOf(req.unit)})`}><Input ltr inputMode="decimal" value={qty} onChange={(e) => setQty(clean(e.target.value))} autoFocus /></Field>
@@ -203,7 +203,7 @@ export function ReceivePoButton({ po }: { po: { id: string; number: number; supp
         <DialogContent
           wide
           title={`رسید کالا — سفارش خرید ${toFaDigits(po.number)}`}
-          description={`${po.supplierName} · مقدار رسیده هر ردیف را وارد کنید؛ دریافت ناقص مجاز است.`}
+          description={`${po.supplierName} • مقدار رسیده هر ردیف را وارد کنید؛ دریافت ناقص مجاز است.`}
           footer={<Button loading={pending} disabled={lines.length === 0} onClick={async () => { if (await run(() => api(`procurement/purchase-orders/${po.id}/receive`, { body: { lines, note: note || undefined, idempotencyKey: d.key.current } }), "رسید کالا ثبت شد.")) d.setOpen(false); }}>ثبت رسید</Button>}
         >
           <div className="space-y-3">
@@ -211,7 +211,7 @@ export function ReceivePoButton({ po }: { po: { id: string; number: number; supp
               <div key={l.id} className="grid grid-cols-[1fr_140px] items-center gap-3">
                 <div>
                   <p className="text-[13.5px] font-bold">{l.materialName}</p>
-                  <p className="text-[12px] text-muted">سفارش {formatNumber(l.quantity, { decimals: true })} · رسیده {formatNumber(l.received, { decimals: true })} {unitOf(l.unit)}</p>
+                  <p className="text-[12px] text-muted">سفارش {formatNumber(l.quantity, { decimals: true })} • رسیده {formatNumber(l.received, { decimals: true })} {unitOf(l.unit)}</p>
                 </div>
                 <Input ltr inputMode="decimal" aria-label={`مقدار رسیده ${l.materialName}`} value={qty[l.id] ?? ""} onChange={(e) => setQty({ ...qty, [l.id]: clean(e.target.value) })} />
               </div>

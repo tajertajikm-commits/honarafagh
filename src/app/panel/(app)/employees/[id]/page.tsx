@@ -49,7 +49,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       <PageHeader
         crumbs={[{ href: "/panel/employees", label: "کارکنان" }]}
         title={<>{row.u.fullName}{!row.e.isActive && <Badge tone="danger" className="ms-2 align-middle">غیرفعال</Badge>}</>}
-        description={<>{row.e.title ?? "—"} · کد <Code>{row.e.personnelCode}</Code> · <Code>{formatPhone(row.u.phone)}</Code></>}
+        description={<>{row.e.title ?? "—"} • کد <Code>{row.e.personnelCode}</Code> • <Code>{formatPhone(row.u.phone)}</Code></>}
         actions={perms.has("employee.manage") && <EmployeeProfileActions employee={{ id: row.e.id, fullName: row.u.fullName, title: row.e.title, hourlyCost: row.e.hourlyCost, isActive: row.e.isActive }} />}
       />
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -76,7 +76,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
               <ul className="divide-y divide-line text-[13px]">
                 {recent.map(({ t, number }) => (
                   <li key={t.id} className="flex items-center justify-between gap-2 py-2">
-                    <span><Link href={`/panel/orders/${t.orderId}`} className="hover:text-accent-ink"><OrderNo n={number} /></Link> · {t.name}</span>
+                    <span><Link href={`/panel/orders/${t.orderId}`} className="hover:text-accent-ink"><OrderNo n={number} /></Link> • {t.name}</span>
                     <span className="flex items-center gap-2 text-muted"><DateText value={t.completedAt ?? t.startedAt} relative /><Status map={TASK_STATUS} value={t.status} /></span>
                   </li>
                 ))}

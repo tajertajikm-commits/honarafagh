@@ -272,8 +272,8 @@ function CustomerPicker({ value, onChange, canCreate }: { value: CustomerPick | 
         <CardBody className="flex flex-wrap items-center gap-3 py-4">
           <div className="grid size-10 place-items-center rounded-full bg-surface-2 font-bold">{value.fullName.slice(0, 1)}</div>
           <div className="min-w-0 flex-1">
-            <p className="font-bold">{value.fullName}{value.companyName && <span className="font-medium text-muted"> · {value.companyName}</span>}</p>
-            <p className="text-[12.5px] text-muted"><bdi dir="ltr">{formatPhone(value.phone)}</bdi>{value.discountPct ? ` · تخفیف ثابت ${formatPercent(value.discountPct)}` : ""}{value.balance && value.balance > 0 ? <> · مانده حساب <Money rial={value.balance} className="text-danger" /></> : null}</p>
+            <p className="font-bold">{value.fullName}{value.companyName && <span className="font-medium text-muted"> • {value.companyName}</span>}</p>
+            <p className="text-[12.5px] text-muted"><bdi dir="ltr">{formatPhone(value.phone)}</bdi>{value.discountPct ? ` • تخفیف ثابت ${formatPercent(value.discountPct)}` : ""}{value.balance && value.balance > 0 ? <> • مانده حساب <Money rial={value.balance} className="text-danger" /></> : null}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => onChange(null)}>تغییر مشتری</Button>
         </CardBody>
@@ -305,7 +305,7 @@ function CustomerPicker({ value, onChange, canCreate }: { value: CustomerPick | 
                 {results.map((c) => (
                   <li key={c.id}>
                     <button type="button" onClick={() => onChange(c)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[13px] hover:bg-surface-2">
-                      <span><b>{c.fullName}</b>{c.companyName && <span className="text-muted"> · {c.companyName}</span>}</span>
+                      <span><b>{c.fullName}</b>{c.companyName && <span className="text-muted"> • {c.companyName}</span>}</span>
                       <bdi dir="ltr" className="text-muted">{formatPhone(c.phone)}</bdi>
                     </button>
                   </li>
@@ -391,9 +391,9 @@ function LineEditor({ index, line: l, products, workflows, mode, canOverride, on
                 <>
                   <span>قیمت: <Money rial={l.price.subtotal} strong /></span>
                   <span className="text-muted">واحد <Money rial={l.price.unitPrice} /></span>
-                  <span className="text-muted">{METHOD[l.price.method] ?? l.price.method} · {formatNumber(l.price.leadDays)} روز کاری</span>
+                  <span className="text-muted">{METHOD[l.price.method] ?? l.price.method} • {formatNumber(l.price.leadDays)} روز کاری</span>
                   {l.price.customerDiscountPct > 0 && <span className="text-success">تخفیف مشتری {formatPercent(l.price.customerDiscountPct)}</span>}
-                  {l.price.costTotal != null && <span className="text-muted">بهای تمام‌شده <Money rial={l.price.costTotal} /> · حاشیه {formatPercent(l.price.marginPct ?? 0)}</span>}
+                  {l.price.costTotal != null && <span className="text-muted">بهای تمام‌شده <Money rial={l.price.costTotal} /> • حاشیه {formatPercent(l.price.marginPct ?? 0)}</span>}
                   {l.loading && <Spinner className="size-4" />}
                 </>
               )}

@@ -37,7 +37,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <PageHeader
         crumbs={[{ href: "/panel/customers", label: "مشتریان" }]}
         title={c.fullName}
-        description={<>{c.companyName && `${c.companyName} · `}<Code>{formatPhone(c.phone)}</Code> · عضو از <DateText value={c.createdAt} /></>}
+        description={<>{c.companyName && `${c.companyName} • `}<Code>{formatPhone(c.phone)}</Code> • عضو از <DateText value={c.createdAt} /></>}
         actions={
           <>
             {perms.has("quote.manage") && <Button asChild size="sm" variant="secondary"><Link href={`/panel/sales/new?mode=quote&customer=${c.id}`}><FileText /> پیش‌فاکتور</Link></Button>}
@@ -93,7 +93,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 <div key={a.id} className="rounded-lg border border-line px-3 py-2">
                   <p className="font-bold">{a.title}{a.isDefault && <span className="ms-2 text-[11px] text-muted">پیش‌فرض</span>}</p>
                   <p className="text-muted">{a.province}، {a.city}، {a.line}</p>
-                  <p className="text-muted">{a.recipientName} · <Code>{formatPhone(a.recipientPhone)}</Code></p>
+                  <p className="text-muted">{a.recipientName} • <Code>{formatPhone(a.recipientPhone)}</Code></p>
                 </div>
               ))}
             </CardBody>

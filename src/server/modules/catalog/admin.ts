@@ -33,7 +33,8 @@ export const productDefinitionSchema = z.object({
   isActive: z.boolean(),
   isFeatured: z.boolean(),
   highlights: z.array(z.string()).max(6),
-  imageUrl: z.string().nullable().optional(),
+  /** Site-relative path or https URL only (never javascript:, data: …). */
+  imageUrl: z.string().max(500).regex(/^(\/[\w\-./]+|https:\/\/[^\s"'<>]+)$/, "آدرس تصویر باید مسیر داخلی یا https باشد.").nullable().optional(),
   methods: z
     .array(z.object({ methodCode: z.string(), workflowTemplateCode: z.string(), minQuantity: z.number().int().min(1), maxQuantity: z.number().int().nullable() }))
     .min(1),
@@ -160,4 +161,46 @@ export async function upsertCategory(ctx: Ctx, input: { id?: string; slug: strin
     if (isUniqueViolation(err)) throw conflict("دسته‌ای با این نامک وجود دارد.");
     throw err;
   }
+}
+
+/** Loads a product as an editable definition (the same shape saveProduct accepts). */
+export async function productDefinitionFor(ctx: Ctx, productId: string): Promise<ProductDefinition> {
+  assertCan(ctx, "catalog.manage");
+  const [p] = await ctx.db.select().from(products).where(eq(products.id, productId));
+  if (!p) throw notFound("محصول");
+  const methods = await ctx.db.select().from(productMethods).where(eq(productMethods.productId, productId)).orderBy(productMethods.sortOrder);
+  const groups = await ctx.db.select().from(productOptionGroups).where(eq(productOptionGroups.productId, productId)).orderBy(productOptionGroups.sortOrder);
+  const values = groups.length ? await ctx.db.select().from(productOptionValues).where(inArray(productOptionValues.groupId, groups.map((g) => g.id))).orderBy(productOptionValues.sortOrder) : [];
+  const [image] = await ctx.db.select().from(productImages).where(eq(productImages.productId, productId)).limit(1);
+  return {
+    slug: p.slug,
+    name: p.name,
+    subtitle: p.subtitle,
+    description: p.description,
+    categoryId: p.categoryId,
+    pricingRuleSetId: p.pricingRuleSetId,
+    spec: productSpecSchema.parse(p.spec),
+    unitLabel: p.unitLabel,
+    minQuantity: p.minQuantity,
+    maxQuantity: p.maxQuantity,
+    quantityStep: p.quantityStep,
+    quantityPresets: p.quantityPresets,
+    requiresArtwork: p.requiresArtwork,
+    offersDesignService: p.offersDesignService,
+    isActive: p.isActive,
+    isFeatured: p.isFeatured,
+    highlights: p.highlights,
+    imageUrl: image?.url ?? null,
+    methods: methods.map((m) => ({ methodCode: m.methodCode, workflowTemplateCode: m.workflowTemplateCode, minQuantity: m.minQuantity, maxQuantity: m.maxQuantity })),
+    groups: groups.map((g) => ({
+      key: g.key,
+      label: g.label,
+      helpText: g.helpText,
+      type: g.type,
+      required: g.required,
+      config: g.config ?? null,
+      isActive: g.isActive,
+      values: values.filter((v) => v.groupId === g.id).map((v) => ({ key: v.key, label: v.label, description: v.description, effects: v.effects, isDefault: v.isDefault, isActive: v.isActive })),
+    })),
+  };
 }

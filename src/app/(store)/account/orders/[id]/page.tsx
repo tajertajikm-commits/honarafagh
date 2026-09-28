@@ -40,7 +40,7 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-[22px] font-bold">سفارش <OrderNo n={o.number} /></h2>
-          <p className="text-[13px] text-muted">ثبت: <DateText value={o.placedAt} withTime />{o.dueDate && <> · تحویل تقریبی: <DateText value={o.dueDate} /></>}</p>
+          <p className="text-[13px] text-muted">ثبت: <DateText value={o.placedAt} withTime />{o.dueDate && <> • تحویل تقریبی: <DateText value={o.dueDate} /></>}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Status map={ORDER_STATUS} value={o.status} />
@@ -60,11 +60,11 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[15px] font-bold">{it.title}</p>
-                      <p className="text-[13px] text-muted">{formatNumber(it.quantity)} {it.unitLabel}{it.quantityDelivered > 0 && ` · ${formatNumber(it.quantityDelivered)} تحویل شده`}</p>
+                      <p className="text-[13px] text-muted">{formatNumber(it.quantity)} {it.unitLabel}{it.quantityDelivered > 0 && ` • ${formatNumber(it.quantityDelivered)} تحویل شده`}</p>
                     </div>
                     <Money rial={it.lineSubtotal} />
                   </div>
-                  {it.summary.length > 0 && <p className="mt-2 text-[12.5px] leading-6 text-muted">{it.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" · ")}</p>}
+                  {it.summary.length > 0 && <p className="mt-2 text-[12.5px] leading-6 text-muted">{it.summary.map((s) => `${s.group}: ${toFaDigits(s.value)}`).join(" • ")}</p>}
                   <ArtworkPanel
                     itemId={it.id}
                     fileStatus={it.fileStatus}
@@ -92,7 +92,7 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
               <CardBody className="space-y-2">
                 {d.shipments.map((s) => (
                   <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-4 py-3 text-[13.5px]">
-                    <span>{formatNumber(s.quantity)} عدد {s.externalProvider ? `· ${s.externalProvider}` : ""} {s.trackingCode && <>· کد رهگیری <Code>{s.trackingCode}</Code></>}</span>
+                    <span>{formatNumber(s.quantity)} عدد {s.externalProvider ? `• ${s.externalProvider}` : ""} {s.trackingCode && <>• کد رهگیری <Code>{s.trackingCode}</Code></>}</span>
                     <span className="flex items-center gap-2">
                       {s.deliveredAt && <DateText value={s.deliveredAt} className="text-muted" />}
                       <Status map={SHIPMENT_STATUS} value={s.status} />
@@ -134,7 +134,7 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
               <CardBody className="text-[13px] leading-7 text-muted">
                 {o.shippingAddress.city}، {o.shippingAddress.line}
                 <br />
-                {o.shippingAddress.recipientName} · <bdi dir="ltr" className="tabular">{formatPhone(o.shippingAddress.recipientPhone)}</bdi>
+                {o.shippingAddress.recipientName} • <bdi dir="ltr" className="tabular">{formatPhone(o.shippingAddress.recipientPhone)}</bdi>
               </CardBody>
             </Card>
           )}

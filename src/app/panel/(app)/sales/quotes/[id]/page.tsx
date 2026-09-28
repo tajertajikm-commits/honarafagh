@@ -36,7 +36,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <PageHeader
         crumbs={[{ href: "/panel/sales?tab=quotes", label: "فروش" }]}
         title={<>پیش‌فاکتور {toFaDigits(q.number)} <Status map={QUOTE_STATUS} value={q.status} className="ms-2 align-middle" /></>}
-        description={<>{d.customer.fullName}{d.customer.companyName && ` · ${d.customer.companyName}`} · صادرشده <DateText value={q.createdAt} />{d.createdBy && ` توسط ${d.createdBy}`}</>}
+        description={<>{d.customer.fullName}{d.customer.companyName && ` • ${d.customer.companyName}`} • صادرشده <DateText value={q.createdAt} />{d.createdBy && ` توسط ${d.createdBy}`}</>}
         actions={
           <>
             {d.orderNumber && q.convertedOrderId && <Button asChild size="sm" variant="secondary"><Link href={`/panel/orders/${q.convertedOrderId}`}>سفارش <OrderNo n={d.orderNumber} /></Link></Button>}
@@ -79,7 +79,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               {q.sentAt && <KV label="ارسال"><DateText value={q.sentAt} withTime /></KV>}
               {q.respondedAt && <KV label="پاسخ مشتری"><DateText value={q.respondedAt} withTime /></KV>}
               {seeCosts && <KV label="حاشیه سود">{formatPercent(margin)}</KV>}
-              {d.inquiry && <KV label="استعلام">{toFaDigits(d.inquiry.number)} · {d.inquiry.title}</KV>}
+              {d.inquiry && <KV label="استعلام">{toFaDigits(d.inquiry.number)} • {d.inquiry.title}</KV>}
             </CardBody>
           </Card>
           {(q.customerNote || q.internalNote) && (
