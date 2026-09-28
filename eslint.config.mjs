@@ -11,7 +11,7 @@ const config = [
       "no-console": ["warn", { allow: ["warn", "error", "info"] }],
     },
   },
-  { ignores: [".next/**", "node_modules/**", "drizzle/**", "storage/**", "playwright-report/**", "test-results/**", "next-env.d.ts"] },
+  { ignores: [".next/**", "node_modules/**", "drizzle/**", "storage/**", "playwright-report/**", "test-results/**", "next-env.d.ts", "demo/.build/**", "demo-dist/**"] },
 ];
 
 export default config;

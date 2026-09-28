@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": { "@/*": ["./src/*"], "@demo/*": ["./demo/runtime/*"] },
+    "plugins": []
+  },
+  "include": ["../next-env.d.ts", "runtime/**/*.ts", "runtime/**/*.tsx", "seed/**/*.ts", "tests/**/*.ts", "next.config.demo.ts"],
+  "exclude": [".build", "../node_modules"]
+}

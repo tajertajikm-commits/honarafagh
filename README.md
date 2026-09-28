@@ -26,6 +26,13 @@ Demo staff: 01 manager, 02 sales, 03 accountant, 04 warehouse + procurement,
 05 designer, 06 prepress/plates, 07 offset operator, 08 digital operator,
 09 cutting/lamination/UV, 10 binding/finishing/packaging, 11 QC, 12 shipping.
 
+### Static demo (no server)
+
+[`demo-dist/printing-house-demo.zip`](demo-dist/printing-house-demo.zip) is a self-contained demo of
+the whole platform that runs in the browser (PostgreSQL as WebAssembly, stored in
+IndexedDB). Extract it into `public_html/printing-demo/` and open `https://your-domain/printing-demo/`:
+no database, Node.js or API keys needed. See [docs/static-demo.md](docs/static-demo.md).
+
 ## Scripts
 
 | Script | Purpose |
@@ -49,6 +56,7 @@ Demo staff: 01 manager, 02 sales, 03 accountant, 04 warehouse + procurement,
 - [Setup and deployment](docs/setup.md)
 - [Testing](docs/testing.md)
 - [HTTP API](docs/api.md)
+- [Static demo (cPanel, no server)](docs/static-demo.md)
 
 ## Integration status (honest)
 

@@ -12,3 +12,6 @@ next-env.d.ts
 .env.*.local
 .DS_Store
 storage-test/
+
+# static demo build output (the ZIP in demo-dist/ is committed)
+demo/.build/
