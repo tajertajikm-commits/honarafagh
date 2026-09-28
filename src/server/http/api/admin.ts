@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { saveProduct, setProductActive, upsertCategory } from "@/server/modules/catalog/admin";
 import { scheduleMaintenance, setMachineStatus, updateMaintenance, upsertMachine } from "@/server/modules/machines/service";
-import { createCustomer, createEmployee, resetEmployeePassword, setEmployeeRoles, updateCustomer, updateEmployee, upsertRole } from "@/server/modules/people/service";
+import { createCustomer, createEmployee, listCustomers, resetEmployeePassword, setEmployeeRoles, updateCustomer, updateEmployee, upsertRole } from "@/server/modules/people/service";
 import { createDraft, discardDraft, getRuleVersion, listRuleSets, priceProduct, publishDraft, updateDraft } from "@/server/modules/pricing/service";
 import { settingsSchemas, updateSetting } from "@/server/modules/settings/service";
+import { invalidateScheduleCache } from "@/server/modules/scheduling/service";
 import { activateTemplate, createTemplateDraft, getTemplate, listTemplates, saveTemplateDraft } from "@/server/modules/workflow/admin";
-import { assertCan } from "@/server/core/context";
+import { assertCan, assertCanAny, can } from "@/server/core/context";
+import { AppError } from "@/server/core/errors";
 import { api } from "../router";
 import { dateLike, phone, reason, selections, urgency, uuid } from "./schemas";
 
@@ -72,6 +74,41 @@ export const adminRoutes = [
     async ({ ctx, params, body }) => updateCustomer(ctx, params.id!, body),
   ),
 
+  api.get("customers", { auth: "staff", query: z.object({ q: z.string().max(80).optional(), page: z.coerce.number().int().min(1).optional() }) }, async ({ ctx, query }) => {
+    const r = await listCustomers(ctx, { q: query.q, page: query.page, pageSize: 20 });
+    return { total: r.total, rows: r.rows.map((x) => ({ id: x.c.id, fullName: x.c.fullName, companyName: x.c.companyName, phone: x.c.phone, discountPct: x.c.discountPct, orderCount: x.orderCount, balance: x.balance })) };
+  }),
+
+  /** Staff price check for manual orders and quotes; cost and margin only for roles allowed to see them. */
+  api.post(
+    "pricing/staff-quote",
+    { auth: "staff", body: z.object({ productId: uuid, quantity: z.number().int().positive().max(1_000_000), selections, urgency, customerId: uuid.nullable().optional() }) },
+    async ({ ctx, body }) => {
+      assertCanAny(ctx, "order.create", "quote.manage", "pricing.view");
+      let p;
+      try {
+        p = await priceProduct(ctx.db, { productId: body.productId, quantity: body.quantity, selections: body.selections, urgency: body.urgency, customerId: body.customerId ?? null });
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError("VALIDATION", "محاسبه قیمت برای این ترکیب ممکن نیست.");
+      }
+      const seeCosts = can(ctx, "pricing.view") || can(ctx, "order.price.override");
+      return {
+        subtotal: p.subtotal,
+        total: p.total,
+        vatAmount: p.vatAmount,
+        unitPrice: p.unitPrice,
+        discountAmount: p.discountAmount,
+        customerDiscountPct: p.customerDiscountPct,
+        leadDays: p.leadDays,
+        method: p.method,
+        summary: p.spec.summary,
+        warnings: p.warnings,
+        ...(seeCosts ? { costTotal: p.costTotal, profit: p.profit, marginPct: p.marginPct } : {}),
+      };
+    },
+  ),
+
   // Catalog
   api.post("catalog/products", { auth: "staff", body: z.unknown() }, async ({ ctx, body }) => ({ id: await saveProduct(ctx, null, body) })),
   api.put("catalog/products/:id", { auth: "staff", body: z.unknown() }, async ({ ctx, params, body }) => ({ id: await saveProduct(ctx, params.id!, body) })),
@@ -106,5 +143,9 @@ export const adminRoutes = [
   api.post("workflows/:id/activate", { auth: "staff" }, async ({ ctx, params }) => activateTemplate(ctx, params.id!)),
 
   // Settings
-  api.put("settings/:key", { auth: "staff", body: z.unknown() }, async ({ ctx, params, body }) => updateSetting(ctx, z.enum(Object.keys(settingsSchemas) as ["business", "orders"]).parse(params.key), body)),
+  api.put("settings/:key", { auth: "staff", body: z.unknown() }, async ({ ctx, params, body }) => {
+    const r = await updateSetting(ctx, z.enum(Object.keys(settingsSchemas) as ["business", "orders"]).parse(params.key), body);
+    invalidateScheduleCache(); // the work calendar feeds capacity planning
+    return r;
+  }),
 ];

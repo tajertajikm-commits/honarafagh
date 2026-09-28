@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { acceptQuote, createInquiry, createQuote, rejectQuote, sendQuote } from "@/server/modules/quotes/service";
+import { acceptQuote, createInquiry, createQuote, rejectQuote, sendQuote, setInquiryStatus } from "@/server/modules/quotes/service";
 import { api } from "../router";
 import { dateLike, rial, selections, urgency, uuid } from "./schemas";
 
@@ -20,6 +20,9 @@ export const quoteRoutes = [
       }),
     },
     async ({ ctx, body }) => createInquiry(ctx, body),
+  ),
+  api.post("inquiries/:id/status", { auth: "staff", body: z.object({ status: z.enum(["IN_REVIEW", "CLOSED", "REJECTED"]), reason: z.string().max(1000).optional() }) }, async ({ ctx, params, body }) =>
+    setInquiryStatus(ctx, params.id!, body.status, body.reason),
   ),
   api.post(
     "quotes",

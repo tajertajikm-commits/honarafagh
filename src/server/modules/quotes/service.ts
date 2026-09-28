@@ -190,3 +190,16 @@ export async function expireQuotes(ctx: Ctx) {
   const rows = await ctx.db.update(quotes).set({ status: "EXPIRED" }).where(and(inArray(quotes.status, ["SENT"]), lt(quotes.validUntil, new Date()))).returning({ id: quotes.id });
   return rows.length;
 }
+
+/** Sales triage of an inquiry. QUOTED is set automatically when a quote is created from it. */
+export async function setInquiryStatus(ctx: Ctx, id: string, status: "IN_REVIEW" | "CLOSED" | "REJECTED", note?: string) {
+  assertCan(ctx, "quote.manage");
+  return inTx(ctx, async (tx) => {
+    const [row] = await tx.db.select().from(inquiries).where(eq(inquiries.id, id)).for("update");
+    if (!row) throw notFound("استعلام");
+    if (["CLOSED", "REJECTED"].includes(row.status) && status !== "IN_REVIEW") throw invalidState("این استعلام بسته شده است.");
+    await tx.db.update(inquiries).set({ status, assignedTo: row.assignedTo ?? actorUserId(tx) }).where(eq(inquiries.id, id));
+    await audit(tx, { action: "inquiry.status", entityType: "inquiry", entityId: id, before: { status: row.status }, after: { status }, reason: note });
+    return { ...row, status };
+  });
+}

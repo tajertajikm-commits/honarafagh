@@ -1,12 +1,12 @@
-import { and, eq, inArray, ne } from "drizzle-orm";
-import { addresses, customers, employeeRoles, employees, rolePermissions, roles, users } from "@/server/db/schema";
-import { type Ctx, assertCan, inTx, requireCustomer } from "@/server/core/context";
+import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { addresses, customers, employeeRoles, employees, orders, rolePermissions, roles, users } from "@/server/db/schema";
+import { type Ctx, assertCan, assertCanAny, inTx, requireCustomer } from "@/server/core/context";
 import { conflict, invalidState, isUniqueViolation, notFound, validation } from "@/server/core/errors";
 import { hashPassword } from "@/server/auth/password";
 import { ALL_WORKSPACES, isPermission } from "@/server/auth/permissions";
 import { revokeAllSessions } from "@/server/auth/sessions";
 import { audit } from "@/server/modules/audit/audit";
-import { normalizePhone } from "@/lib/persian";
+import { normalizeFa, normalizePhone, toEnDigits } from "@/lib/persian";
 
 // ── Employees ───────────────────────────────────────────────────────────────
 
@@ -173,4 +173,65 @@ export async function deleteAddress(ctx: Ctx, id: string) {
 
 export async function rolesByIds(ctx: Ctx, ids: string[]) {
   return ids.length ? ctx.db.select().from(roles).where(inArray(roles.id, ids)) : [];
+}
+
+// ── Customer directory ──────────────────────────────────────────────────────
+
+/** Customers with order stats; searchable by name, company or phone. */
+export async function listCustomers(ctx: Ctx, f: { q?: string; page?: number; pageSize?: number } = {}) {
+  assertCanAny(ctx, "customer.view", "order.create", "quote.manage");
+  const pageSize = Math.min(f.pageSize ?? 25, 100);
+  const page = Math.max(1, f.page ?? 1);
+  const conds = [];
+  if (f.q?.trim()) {
+    const q = normalizeFa(f.q);
+    const digits = toEnDigits(q).replace(/\D/g, "");
+    conds.push(or(ilike(customers.fullName, `%${q}%`), ilike(customers.companyName, `%${q}%`), digits.length >= 3 ? ilike(customers.phone, `%${digits}%`) : undefined));
+  }
+  const where = conds.length ? and(...conds) : undefined;
+  const rows = await ctx.db
+    .select({
+      c: customers,
+      orderCount: sql<number>`(select count(*) from orders o where o.customer_id = ${customers.id} and o.status <> 'CANCELLED')::int`,
+      revenue: sql<number>`coalesce((select sum(o.total) from orders o where o.customer_id = ${customers.id} and o.status <> 'CANCELLED'), 0)::float`,
+      balance: sql<number>`coalesce((select sum(o.total - (o.paid_amount - o.refunded_amount)) from orders o where o.customer_id = ${customers.id} and o.status not in ('CANCELLED','PENDING_REVIEW')), 0)::float`,
+      lastOrderAt: sql<Date | null>`(select max(o.placed_at) from orders o where o.customer_id = ${customers.id})`,
+    })
+    .from(customers)
+    .where(where)
+    .orderBy(desc(sql`coalesce((select max(o.placed_at) from orders o where o.customer_id = ${customers.id}), ${customers.createdAt})`))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+  const [{ total }] = (await ctx.db.select({ total: sql<number>`count(*)::int` }).from(customers).where(where)) as [{ total: number }];
+  return { rows, total, page, pageSize };
+}
+
+export async function customerDetail(ctx: Ctx, id: string) {
+  assertCan(ctx, "customer.view");
+  const [c] = await ctx.db.select().from(customers).where(eq(customers.id, id));
+  if (!c) throw notFound("مشتری");
+  const addrs = await ctx.db.select().from(addresses).where(eq(addresses.customerId, id));
+  const recent = await ctx.db.select().from(orders).where(eq(orders.customerId, id)).orderBy(desc(orders.placedAt)).limit(50);
+  return { customer: c, addresses: addrs, orders: recent };
+}
+
+// ── Staff directory ─────────────────────────────────────────────────────────
+
+export async function listEmployees(ctx: Ctx) {
+  assertCanAny(ctx, "employee.view", "role.manage");
+  const rows = await ctx.db
+    .select({ e: employees, fullName: users.fullName, phone: users.phone, lastLoginAt: users.lastLoginAt })
+    .from(employees)
+    .innerJoin(users, eq(users.id, employees.userId))
+    .orderBy(desc(employees.isActive), employees.personnelCode);
+  const links = await ctx.db.select({ employeeId: employeeRoles.employeeId, roleId: employeeRoles.roleId }).from(employeeRoles);
+  return rows.map((r) => ({ ...r, roleIds: links.filter((l) => l.employeeId === r.e.id).map((l) => l.roleId) }));
+}
+
+export async function listRoles(ctx: Ctx) {
+  assertCanAny(ctx, "employee.view", "role.manage");
+  const rs = await ctx.db.select().from(roles).orderBy(roles.name);
+  const perms = await ctx.db.select().from(rolePermissions);
+  const members = await ctx.db.select({ roleId: employeeRoles.roleId, n: sql<number>`count(*)::int` }).from(employeeRoles).groupBy(employeeRoles.roleId);
+  return rs.map((r) => ({ ...r, permissions: perms.filter((p) => p.roleId === r.id).map((p) => p.permission), members: members.find((m) => m.roleId === r.id)?.n ?? 0 }));
 }

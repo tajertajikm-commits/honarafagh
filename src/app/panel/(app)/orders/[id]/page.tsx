@@ -20,7 +20,7 @@ import { OrderTimeline } from "@/components/store/timeline";
 import { cn } from "@/lib/cn";
 import { DELIVERY_STATUS, FILE_STATUS, ISSUE_TYPE, METHOD, ORDER_STATUS, PAYMENT_STATUS, PRIORITY, PROCUREMENT_STATUS, PRODUCTION_STATUS, QC_STATUS, stateChange, URGENCY } from "@/lib/labels";
 import { formatNumber, formatPercent, formatPhone, toFaDigits } from "@/lib/persian";
-import { deliveryMethods, employees, machines, users, vehicles } from "@/server/db/schema";
+import { deliveryMethods, employees, machines, users, vehicles, workflowTemplates } from "@/server/db/schema";
 import { isAppError } from "@/server/core/errors";
 import { requireStaffPage } from "@/server/http/session";
 import { shippableQuantities } from "@/server/modules/delivery/service";
@@ -50,6 +50,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
   const vs = await ctx.db.select().from(vehicles).where(eq(vehicles.isActive, true));
   const shippable = await shippableQuantities(ctx, id);
   const couriers = await courierList(ctx);
+  const wfNames = new Map((await ctx.db.select({ code: workflowTemplates.code, name: workflowTemplates.name }).from(workflowTemplates)).map((w) => [w.code, w.name]));
   const empName = new Map(staff.map((s) => [s.id, s.name]));
   const machineName = new Map(ms.map((m) => [m.id, m.name]));
   const balance = o.total - (o.paidAmount - o.refundedAmount);
@@ -146,7 +147,7 @@ export default async function StaffOrderPage({ params }: { params: Promise<{ id:
                       <div>
                         <p className="text-[14.5px] font-bold">{it.title} <span className="font-medium text-muted">× {formatNumber(it.quantity)} {it.unitLabel}</span></p>
                         <p className="mt-0.5 text-[12.5px] text-muted">
-                          {it.productionMethod && <>چاپ {METHOD[it.productionMethod]} · </>}{it.workflowTemplateCode && <Code>{it.workflowTemplateCode}</Code>}{snap && <> · آماده‌سازی {toFaDigits(snap.leadDays)} روز</>}
+                          {it.productionMethod && <>چاپ {METHOD[it.productionMethod]} · </>}{it.workflowTemplateCode && <>{wfNames.get(it.workflowTemplateCode) ?? it.workflowTemplateCode}</>}{snap && <> · آماده‌سازی {toFaDigits(snap.leadDays)} روز</>}
                           {it.isPriceOverridden && <Badge tone="warning" className="ms-2">قیمت دستی</Badge>}
                         </p>
                       </div>

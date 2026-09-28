@@ -96,3 +96,29 @@ export async function listProducts(db: Executor, opts: { categoryId?: string; fe
   const images = ids.length ? await db.select().from(productImages).where(inArray(productImages.productId, ids)).orderBy(asc(productImages.sortOrder)) : [];
   return rows.map((r) => ({ ...r.product, category: r.category, image: images.find((i) => i.productId === r.product.id) ?? null }));
 }
+
+/** Active products with option groups, shaped for the staff order/quote builder. */
+export async function builderProducts(db: Executor) {
+  const list = await listProducts(db);
+  const out = [];
+  for (const p of list) {
+    const d = await loadProductDetail(db, { id: p.id });
+    out.push({
+      id: d.product.id,
+      name: d.product.name,
+      unitLabel: d.product.unitLabel,
+      minQuantity: d.product.minQuantity,
+      maxQuantity: d.product.maxQuantity,
+      quantityPresets: d.product.quantityPresets,
+      groups: d.groups.map((g) => ({
+        key: g.key,
+        label: g.label,
+        type: g.type,
+        required: g.required,
+        config: g.config ?? null,
+        values: g.values.map((v) => ({ key: v.key, label: v.label, isDefault: v.isDefault, customTrim: !!v.effects.customTrim })),
+      })),
+    });
+  }
+  return out;
+}

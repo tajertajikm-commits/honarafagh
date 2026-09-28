@@ -47,14 +47,13 @@ export async function readyToShip(ctx: Ctx) {
         paymentGateOverride: orders.paymentGateOverride,
       },
       customerName: customers.fullName,
-      customerPhone: users.phone,
+      customerPhone: customers.phone,
       item: { id: orderItems.id, title: orderItems.title, quantity: orderItems.quantity },
       shippable: shippableQty,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .innerJoin(customers, eq(customers.id, orders.customerId))
-    .innerJoin(users, eq(users.id, customers.userId))
     .where(and(eq(orderItems.status, "ACTIVE"), inArray(orders.status, ["IN_PROGRESS", "READY"]), sql`${shippableQty} > 0`))
     .orderBy(sql`${orders.readyAt} asc nulls last`, asc(orders.number));
   const byOrder = new Map<string, { order: (typeof rows)[number]["order"]; customerName: string; customerPhone: string; lines: { itemId: string; title: string; remaining: number }[] }>();

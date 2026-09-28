@@ -26,13 +26,12 @@ export async function receivables(ctx: Ctx) {
       customerId: customers.id,
       customerName: customers.fullName,
       companyName: customers.companyName,
-      customerPhone: users.phone,
+      customerPhone: customers.phone,
       creditLimit: customers.creditLimit,
       pendingApproval: sql<number>`coalesce((select sum(p.amount) from payments p where p.order_id = ${orders.id} and p.kind = 'PAYMENT' and p.status = 'AWAITING_APPROVAL'), 0)::float`,
     })
     .from(orders)
     .innerJoin(customers, eq(customers.id, orders.customerId))
-    .innerJoin(users, eq(users.id, customers.userId))
     .where(and(ne(orders.status, "CANCELLED"), ne(orders.status, "PENDING_REVIEW"), sql`${balanceSql} > 0`))
     .orderBy(sql`case when ${orders.status} = 'READY' then 0 when ${orders.status} = 'COMPLETED' then 1 else 2 end`, orders.placedAt);
 }
