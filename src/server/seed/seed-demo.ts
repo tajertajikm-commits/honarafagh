@@ -79,6 +79,27 @@ export async function seedDemo(db: Database, ref: ReferenceIds) {
     await reviewArtwork(prepress, v.id, { decision: "APPROVE", note: "فایل استاندارد است" });
   };
   const pay = (orderId: string, amount: number, method: "POS" | "CASH" | "BANK_TRANSFER", key: string) => recordManualPayment(acc, orderId, { method, amount, reference: method === "BANK_TRANSFER" ? "7731" + key.length : null, idempotencyKey: key });
+  /**
+   * Seeded history is produced in seconds; give each completed task a
+   * realistic, sequential duration (estimate × 0.85–1.3) so production,
+   * machine and labour reports have meaningful numbers.
+   */
+  const respaceHistory = async (orderId: string, seedNo: number) => {
+    const [o] = await db.select({ placedAt: t.orders.placedAt }).from(t.orders).where(eq(t.orders.id, orderId));
+    const list = await db.select().from(t.productionTasks).where(and(eq(t.productionTasks.orderId, orderId), eq(t.productionTasks.status, "COMPLETED"))).orderBy(asc(t.productionTasks.completedAt));
+    let cursor = new Date(o!.placedAt.getTime() + 2 * 3_600_000);
+    for (const [k, task] of list.entries()) {
+      const factor = 0.85 + (((seedNo * 7 + k * 13) % 10) / 10) * 0.45;
+      const minutes = task.gate ? 0 : Math.max(5, Math.round((task.estimatedMinutes || 20) * factor));
+      const start = cursor;
+      const end = new Date(start.getTime() + minutes * 60_000);
+      await db.update(t.productionTasks).set({ startedAt: task.gate ? null : start, completedAt: end }).where(eq(t.productionTasks.id, task.id));
+      await db.update(t.taskTimeLogs).set({ startedAt: start, endedAt: end }).where(eq(t.taskTimeLogs.taskId, task.id));
+      cursor = new Date(end.getTime() + (task.gate ? 0 : 20 * 60_000));
+    }
+    await db.execute(sql`UPDATE orders SET ready_at = ${cursor}, completed_at = ${cursor}::timestamptz + interval '1 day' WHERE id = ${orderId}`);
+  };
+
   const run = async (ctx: Ctx, taskId: string | undefined, machine?: string, consumption?: { requirementId: string; consumed: number; wasted: number }[]) => {
     if (!taskId) return;
     // Seeding compresses time: waits such as ink drying are overridden by the manager.
@@ -155,6 +176,8 @@ export async function seedDemo(db: Database, ref: ReferenceIds) {
     await db.execute(sql`UPDATE payments SET confirmed_at = confirmed_at - ${shift} + interval '1 day', created_at = created_at - ${shift} WHERE order_id = ${o.id}`);
     await db.execute(sql`UPDATE production_tasks SET started_at = started_at - ${shift}, completed_at = completed_at - ${shift}, ready_at = ready_at - ${shift} WHERE order_id = ${o.id}`);
     await db.execute(sql`UPDATE order_events SET created_at = created_at - ${shift} WHERE order_id = ${o.id}`);
+    await db.execute(sql`UPDATE qc_inspections SET created_at = created_at - ${shift} WHERE job_id IN (SELECT id FROM production_jobs WHERE order_id = ${o.id})`);
+    await respaceHistory(o.id, i);
   }
 
   // ── Live orders in every interesting state ────────────────────────────────

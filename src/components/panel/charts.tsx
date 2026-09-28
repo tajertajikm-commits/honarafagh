@@ -126,9 +126,11 @@ export function ColumnChart({ data, height = 200, format = (n: number) => format
       </div>
       <div className="mt-1.5 flex gap-2">
         <div className="w-14 shrink-0" />
-        <div className="flex flex-1 gap-[2px] text-[10.5px] text-subtle">
+        <div className="flex h-4 flex-1 gap-[2px] text-[10.5px] text-subtle">
           {data.map((d, i) => (
-            <span key={d.label} className="flex-1 truncate text-center">{i % labelEvery === 0 ? d.label : ""}</span>
+            <span key={d.label} className="relative flex-1">
+              {i % labelEvery === 0 && <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap">{d.label}</span>}
+            </span>
           ))}
         </div>
       </div>

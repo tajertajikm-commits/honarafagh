@@ -134,8 +134,8 @@ export function formatRelative(d: DateInput, now: Date = new Date()): string {
 
 /** 135 → "۲ ساعت و ۱۵ دقیقه" */
 export function formatDuration(minutes: number): string {
-  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
   const m = Math.round(minutes);
+  if (!Number.isFinite(minutes) || m <= 0) return "—";
   const h = Math.floor(m / 60);
   const r = m % 60;
   if (h === 0) return `${toFaDigits(r)} دقیقه`;
