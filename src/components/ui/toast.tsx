@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, CircleAlert, X } from "lucide-react";
+import { Direction } from "radix-ui";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -17,7 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ push }), [push]);
   return (
     <Ctx.Provider value={value}>
-      {children}
+      <Direction.Provider dir="rtl">{children}</Direction.Provider>
       <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4" aria-live="polite">
         {items.map((t) => (
           <div

@@ -151,3 +151,16 @@ export function formatOrderNumber(n: number): string {
 export function countLabel(n: number, noun: string): string {
   return `${formatNumber(n)} ${noun}`;
 }
+
+const dayFmt = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { timeZone: TZ, day: "numeric" });
+const dayMonthFmt = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { timeZone: TZ, day: "numeric", month: "long" });
+/** "۵" — for dense chart axes. */
+export function formatDay(d: DateInput): string {
+  const date = toDate(d);
+  return date ? dayFmt.format(date) : "—";
+}
+/** "۵ مهر" */
+export function formatDayMonth(d: DateInput): string {
+  const date = toDate(d);
+  return date ? dayMonthFmt.format(date) : "—";
+}

@@ -30,6 +30,9 @@
   --color-brand-gray: #bbbdc1;
 
   --color-accent: #f26422;
+  /* Chart series hue (validated for light & dark surfaces). */
+  --color-series: #e4561a;
+  --color-series-soft: rgb(228 86 26 / 0.12);
   --color-accent-ink: #c2410c;
   --color-accent-soft: #fff1ea;
 

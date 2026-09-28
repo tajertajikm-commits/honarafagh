@@ -189,3 +189,19 @@ export function label(map: Map_, key: string | null | undefined): string {
 export function tone(map: Map_, key: string | null | undefined): Tone {
   return (key && map[key]?.[1]) || "neutral";
 }
+
+const DOMAIN_MAP: Record<string, Map_> = {
+  ORDER: ORDER_STATUS,
+  PAYMENT: PAYMENT_STATUS,
+  FILE: FILE_STATUS,
+  PROCUREMENT: PROCUREMENT_STATUS,
+  PRODUCTION: PRODUCTION_STATUS,
+  QC: QC_STATUS,
+  DELIVERY: DELIVERY_STATUS,
+};
+/** "در صف ← در حال تولید" for an order-event state change. */
+export function stateChange(domain: string, from: string | null, to: string | null): string {
+  const m = DOMAIN_MAP[domain];
+  if (!m) return `${from ?? ""} ← ${to ?? ""}`;
+  return `${label(m, from)} ← ${label(m, to)}`;
+}

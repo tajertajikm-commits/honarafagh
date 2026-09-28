@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { entityFiles, productionJobs, productionTasks, qcDefects, qcInspections } from "@/server/db/schema";
 import { type Ctx, actorUserId, assertCan, inTx, isStaff } from "@/server/core/context";
 import { invalidState, notFound, validation } from "@/server/core/errors";
@@ -75,12 +75,13 @@ export async function recordInspection(ctx: Ctx, taskId: string, input: Inspecti
     if (input.result === "FAILED") {
       const qty = inspection!.reworkQuantity!;
       await sendToRework(tx, t, input.reworkTargetStepKey!, input.notes || "رد در کنترل کیفیت", qty, t.id);
+      const [target] = await tx.db.select({ name: productionTasks.name }).from(productionTasks).where(and(eq(productionTasks.jobId, t.jobId), eq(productionTasks.stepKey, input.reworkTargetStepKey!))).limit(1);
       await orderEvent(tx, {
         orderId: t.orderId,
         orderItemId: job!.orderItemId,
         domain: "QC",
         type: "QC_FAILED",
-        message: `«${t.name}» رد شد — دوباره‌کاری از مرحله ${input.reworkTargetStepKey} برای ${formatNumber(qty)} عدد`,
+        message: `«${t.name}» رد شد — دوباره‌کاری از مرحله «${target?.name ?? input.reworkTargetStepKey}» برای ${formatNumber(qty)} عدد`,
       });
       await emit(tx, "QcFailed", { type: "order", id: t.orderId }, { orderId: t.orderId, taskId: t.id, inspectionId: inspection!.id });
     }
