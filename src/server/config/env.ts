@@ -74,6 +74,14 @@ export function env(): Env {
   return cached;
 }
 
+/**
+ * Absolute URL for a path inside the app. Unlike `new URL(path, APP_URL)`, it
+ * keeps a sub-path in APP_URL (e.g. https://example.com/printing-demo).
+ */
+export function appUrl(path: string): URL {
+  return new URL(env().APP_URL.replace(/\/+$/, "") + (path.startsWith("/") ? path : `/${path}`));
+}
+
 /** For tests only. */
 export function resetEnvCache() {
   cached = undefined;

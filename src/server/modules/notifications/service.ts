@@ -131,9 +131,11 @@ export async function dispatchNotifications(ctx: Ctx, e: OutboxRow) {
           await ctx.db.update(notifications).set({ status: "FAILED", error: String(err).slice(0, 500) }).where(eq(notifications.id, n.id));
         }
       } else if (t.channel === "IN_APP" && customer.userId) {
+        // In-app links are app-relative (SMS bodies carry the absolute URL).
+        const link = e.payload.orderId ? `/account/orders/${String(e.payload.orderId)}` : e.payload.quoteId ? `/account/quotes/${String(e.payload.quoteId)}` : "/account";
         await ctx.db
           .insert(notifications)
-          .values({ userId: customer.userId, channel: "IN_APP", eventType: e.type, title, body, link: String(vars.link ?? ""), status: "SENT", sentAt: new Date(), dedupeKey: `${dedupeScope}:IN_APP:${customer.userId}`, outboxEventId: e.id })
+          .values({ userId: customer.userId, channel: "IN_APP", eventType: e.type, title, body, link, status: "SENT", sentAt: new Date(), dedupeKey: `${dedupeScope}:IN_APP:${customer.userId}`, outboxEventId: e.id })
           .onConflictDoNothing();
       }
     } else if (t.audience === "ROLE" && t.roleCode && t.channel === "IN_APP") {

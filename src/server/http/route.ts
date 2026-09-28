@@ -26,27 +26,47 @@ export interface RouteArgs<B, Q> {
   req: NextRequest;
 }
 
+/**
+ * Which UI made the call ("store" | "panel"); set by src/lib/api-client.ts. Only
+ * decides which session an `auth: "any"` route tries first when a browser holds
+ * both a staff and a customer session. Each session is still verified by kind.
+ */
+export const SURFACE_HEADER = "x-honar-surface";
+
+async function staffFrom(req: NextRequest): Promise<Actor | null> {
+  const token = req.cookies.get(STAFF_COOKIE)?.value;
+  if (!token) return null;
+  const s = await resolveSession(getDb(), token, "STAFF");
+  return (s && (await loadStaffActor(getDb(), s.userId))) || null;
+}
+
+async function customerFrom(req: NextRequest): Promise<Actor | null> {
+  const token = req.cookies.get(CUSTOMER_COOKIE)?.value;
+  if (!token) return null;
+  const s = await resolveSession(getDb(), token, "CUSTOMER");
+  return (s && (await loadCustomerActor(getDb(), s.userId))) || null;
+}
+
 export async function resolveActor(req: NextRequest, mode: AuthMode): Promise<Actor> {
-  const db = getDb();
-  if (mode === "staff" || mode === "any") {
-    const token = req.cookies.get(STAFF_COOKIE)?.value;
-    if (token) {
-      const s = await resolveSession(db, token, "STAFF");
-      const actor = s && (await loadStaffActor(db, s.userId));
+  if (mode === "staff") {
+    const actor = await staffFrom(req);
+    if (!actor) throw new AppError("UNAUTHENTICATED", "ابتدا وارد پنل شوید.");
+    return actor;
+  }
+  if (mode === "customer") {
+    const actor = await customerFrom(req);
+    if (!actor) throw new AppError("UNAUTHENTICATED", "برای ادامه وارد حساب کاربری شوید.");
+    return actor;
+  }
+  if (mode === "any") {
+    const order = req.headers.get(SURFACE_HEADER) === "store" ? [customerFrom, staffFrom] : [staffFrom, customerFrom];
+    for (const from of order) {
+      const actor = await from(req);
       if (actor) return actor;
     }
-    if (mode === "staff") throw new AppError("UNAUTHENTICATED", "ابتدا وارد پنل شوید.");
+    return { kind: "anonymous" };
   }
-  if (mode === "customer" || mode === "any" || mode === "public") {
-    const token = req.cookies.get(CUSTOMER_COOKIE)?.value;
-    if (token) {
-      const s = await resolveSession(db, token, "CUSTOMER");
-      const actor = s && (await loadCustomerActor(db, s.userId));
-      if (actor) return actor;
-    }
-    if (mode === "customer") throw new AppError("UNAUTHENTICATED", "برای ادامه وارد حساب کاربری شوید.");
-  }
-  return { kind: "anonymous" };
+  return (await customerFrom(req)) ?? { kind: "anonymous" };
 }
 
 /** Blocks cross-site form/JSON posts: mutating requests must come from our own origin. */

@@ -11,10 +11,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Tells the API which UI is calling, so routes open to both staff and customers
+ * use the matching session when a browser holds both (see SURFACE_HEADER).
+ */
+export function surfaceHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  return { "X-Honar-Surface": /(^|\/)panel(\/|$)/.test(window.location.pathname) ? "panel" : "store" };
+}
+
 export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal } = {}): Promise<T> {
   const res = await fetch(`/api/v1/${path.replace(/^\//, "")}`, {
     method: init.method ?? (init.body !== undefined || init.form ? "POST" : "GET"),
-    headers: init.form ? undefined : { "Content-Type": "application/json" },
+    headers: init.form ? surfaceHeaders() : { "Content-Type": "application/json", ...surfaceHeaders() },
     body: init.form ?? (init.body !== undefined ? JSON.stringify(init.body) : undefined),
     credentials: "same-origin",
     signal: init.signal,

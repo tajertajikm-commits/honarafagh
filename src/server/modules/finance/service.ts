@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { customers, orders, payments } from "@/server/db/schema";
-import { env } from "@/server/config/env";
+import { appUrl } from "@/server/config/env";
 import { type Ctx, actorUserId, assertCan, can, inTx, systemCtx } from "@/server/core/context";
 import { AppError, conflict, invalidState, isUniqueViolation, notFound, validation } from "@/server/core/errors";
 import { audit } from "@/server/modules/audit/audit";
@@ -80,7 +80,7 @@ export async function startOnlinePayment(ctx: Ctx, orderId: string, input: { amo
       throw err;
     }
   });
-  const callbackUrl = new URL(`/api/v1/payments/callback/${provider.name}`, env().APP_URL);
+  const callbackUrl = appUrl(`/api/v1/payments/callback/${provider.name}`);
   callbackUrl.searchParams.set("pid", created.payment.id);
   // Gateway call happens outside the DB transaction.
   const req = await provider.request({

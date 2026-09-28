@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { env } from "@/server/config/env";
+import { appUrl } from "@/server/config/env";
 import { approvePayment, handlePaymentCallback, recordManualPayment, refundPayment, rejectPayment, startOnlinePayment } from "@/server/modules/finance/service";
 import { api } from "../router";
 import { dateLike, idempotencyKey, note, positiveRial, reason, uuid } from "./schemas";
@@ -20,7 +20,7 @@ export const paymentRoutes = [
     } catch (err) {
       console.error("[payment] callback failed", err);
     }
-    const url = new URL("/payment/result", env().APP_URL);
+    const url = appUrl("/payment/result");
     url.searchParams.set("status", status);
     if (orderId) url.searchParams.set("order", orderId);
     if (pid) url.searchParams.set("pid", pid);

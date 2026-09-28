@@ -2,6 +2,7 @@
 
 import { FileUp, Paperclip, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { surfaceHeaders } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/persian";
 
@@ -33,6 +34,7 @@ function upload(file: File, purpose: Purpose, onProgress: (p: number) => void): 
     };
     xhr.onerror = () => reject(new Error("ارتباط قطع شد."));
     xhr.open("POST", "/api/v1/uploads");
+    for (const [k, v] of Object.entries(surfaceHeaders())) xhr.setRequestHeader(k, v);
     xhr.send(form);
   });
 }

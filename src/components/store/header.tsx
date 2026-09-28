@@ -3,6 +3,7 @@ import { ShoppingBag, UserRound } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { toFaDigits } from "@/lib/persian";
 import { MobileNav } from "./mobile-nav";
+import { NotificationsBell } from "./notifications-bell";
 
 const NAV = [
   { href: "/products", label: "محصولات" },
@@ -30,6 +31,7 @@ export function StoreHeader({ cartCount, customerName }: { cartCount: number; cu
             <UserRound className="size-[18px]" />
             <span className="hidden max-w-[10rem] truncate sm:inline">{customerName || (customerName === "" ? "حساب من" : "ورود")}</span>
           </Link>
+          {customerName !== null && <NotificationsBell />}
           <Link href="/cart" className="relative grid size-10 place-items-center rounded-md text-ink-2 hover:bg-surface-2 hover:text-ink" aria-label={`سبد خرید (${cartCount})`}>
             <ShoppingBag className="size-[19px]" />
             {cartCount > 0 && (

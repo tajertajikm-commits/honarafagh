@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { FlaskConical } from "lucide-react";
 import { Money } from "@/components/ui/misc";
-import { env } from "@/server/config/env";
+import { appUrl, env } from "@/server/config/env";
 
 export const metadata: Metadata = { title: "درگاه آزمایشی", robots: { index: false } };
 
@@ -12,8 +12,8 @@ export default async function SandboxGateway({ searchParams }: { searchParams: P
   const { authority, amount, callback } = await searchParams;
   if (!authority || !callback) notFound();
   const cb = new URL(callback);
-  if (cb.origin !== new URL(env().APP_URL).origin) notFound();
-  const target = (status: "OK" | "NOK") => {
+  if (cb.origin !== appUrl("/").origin) notFound();
+  const target = (status: "OK" | "FAIL" | "NOK") => {
     const u = new URL(cb);
     u.searchParams.set("Authority", authority);
     u.searchParams.set("Status", status);
@@ -29,6 +29,7 @@ export default async function SandboxGateway({ searchParams }: { searchParams: P
         <Money rial={Number(amount ?? 0)} className="text-[28px] font-bold" />
         <div className="mt-8 grid gap-2">
           <a href={target("OK")} className="inline-flex h-12 items-center justify-center rounded-lg bg-success text-[15px] font-bold text-white hover:brightness-110">پرداخت موفق</a>
+          <a href={target("FAIL")} className="inline-flex h-12 items-center justify-center rounded-lg bg-danger text-[15px] font-bold text-white hover:brightness-110">پرداخت ناموفق (رد توسط بانک)</a>
           <a href={target("NOK")} className="inline-flex h-12 items-center justify-center rounded-lg border border-line-strong text-[15px] font-bold hover:bg-surface-2">انصراف از پرداخت</a>
         </div>
       </div>

@@ -25,3 +25,8 @@ export class FakeSmsProvider implements SmsProvider {
     return { messageId: null };
   }
 }
+
+/** Latest codes issued by the fake provider (demo control panel only; empty with real providers). */
+export function recentFakeOtps(): { phone: string; code: string; at: number }[] {
+  return [...lastCodes.entries()].map(([phone, v]) => ({ phone, ...v })).sort((a, b) => b.at - a.at);
+}

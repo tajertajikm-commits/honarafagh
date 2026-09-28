@@ -88,6 +88,17 @@ describe("online payment (fake gateway)", () => {
     expect((await orderRow(orderId)).paymentStatus).toBe("PARTIALLY_PAID");
   });
 
+  it("records a payment the bank declines at verification as failed, without crediting", async () => {
+    const before = await orderRow(orderId);
+    const start = await startOnlinePayment(customer.ctx, orderId, { idempotencyKey: "p3" });
+    const authority = new URL(start.redirectUrl).searchParams.get("authority")!;
+    const failed = await handlePaymentCallback("fake", new URLSearchParams({ pid: start.paymentId, Authority: authority, Status: "FAIL" }));
+    expect(failed.status).toBe("FAILED");
+    const after = await orderRow(orderId);
+    expect(after.paidAmount).toBe(before.paidAmount);
+    expect(after.paymentStatus).toBe("PARTIALLY_PAID");
+  });
+
   it("another customer cannot pay into (or read) someone else's order", async () => {
     const other = await newCustomer("09360000003");
     await expect(startOnlinePayment(other.ctx, orderId, { idempotencyKey: "x" })).rejects.toThrow(/پیدا نشد/);
