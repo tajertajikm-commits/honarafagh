@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/*
+ * Honar Afagh design system.
+ * Neutral, ink-first interface; the logo's four inks (yellow → amber →
+ * orange → red) are reserved for brand moments, focus, progress and status.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: var(--font-abar), "Segoe UI", Tahoma, "Noto Sans Arabic", system-ui, sans-serif;
+
+  --color-canvas: #f6f6f4;
+  --color-surface: #ffffff;
+  --color-surface-2: #f2f2ef;
+  --color-surface-3: #eaeae6;
+  --color-ink: #121214;
+  --color-ink-2: #3a3a40;
+  --color-muted: #6b6b73;
+  --color-subtle: #9d9da5;
+  --color-line: #e6e6e2;
+  --color-line-strong: #d4d4cf;
+  --color-overlay: rgb(18 18 20 / 0.45);
+
+  --color-brand-yellow: #fff301;
+  --color-brand-amber: #fdb913;
+  --color-brand-orange: #f26422;
+  --color-brand-red: #ed1d26;
+  --color-brand-gray: #bbbdc1;
+
+  --color-accent: #f26422;
+  --color-accent-ink: #c2410c;
+  --color-accent-soft: #fff1ea;
+
+  --color-success: #15803d;
+  --color-success-soft: #eaf7ef;
+  --color-warning: #a15c07;
+  --color-warning-soft: #fff6e0;
+  --color-danger: #c81e1e;
+  --color-danger-soft: #fdeeee;
+  --color-info: #1d4ed8;
+  --color-info-soft: #edf2ff;
+  --color-violet: #6d28d9;
+  --color-violet-soft: #f3efff;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+
+  --shadow-soft: 0 1px 2px rgb(18 18 20 / 0.04), 0 1px 1px rgb(18 18 20 / 0.03);
+  --shadow-card: 0 1px 2px rgb(18 18 20 / 0.05), 0 4px 16px -8px rgb(18 18 20 / 0.08);
+  --shadow-float: 0 12px 40px -12px rgb(18 18 20 / 0.25), 0 2px 6px rgb(18 18 20 / 0.06);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 180ms var(--ease-out);
+  --animate-rise: rise 240ms var(--ease-out);
+  --animate-sheet: sheet-in 260ms var(--ease-out);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-in {
+  from { transform: translateX(-24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+[data-theme="dark"] {
+  --color-canvas: #0e0e10;
+  --color-surface: #17171a;
+  --color-surface-2: #1e1e22;
+  --color-surface-3: #27272c;
+  --color-ink: #f4f4f5;
+  --color-ink-2: #d4d4d8;
+  --color-muted: #a1a1aa;
+  --color-subtle: #71717a;
+  --color-line: #2a2a30;
+  --color-line-strong: #3a3a42;
+  --color-overlay: rgb(0 0 0 / 0.6);
+  --color-accent-ink: #ff8a50;
+  --color-accent-soft: #3a1c10;
+  --color-success: #4ade80;
+  --color-success-soft: #10291a;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #2d2206;
+  --color-danger: #f87171;
+  --color-danger-soft: #3a1414;
+  --color-info: #8ab4ff;
+  --color-info-soft: #14203d;
+  --color-violet: #c4b5fd;
+  --color-violet-soft: #251a40;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+  body {
+    /* Abar Low has tall ascenders; 1.75 keeps Persian lines calm without looking loose. */
+    line-height: 1.75;
+    font-size: 15px;
+    font-weight: 500;
+    background: var(--color-canvas);
+  }
+  /* Persian must never be letter-spaced: it breaks joining. */
+  * { letter-spacing: 0; }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.45; color: var(--color-ink); }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: color-mix(in srgb, var(--color-brand-amber) 45%, transparent); }
+  input, textarea, select, button { font: inherit; }
+  input::placeholder, textarea::placeholder { color: var(--color-subtle); }
+  input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+  table { border-collapse: separate; border-spacing: 0; }
+  a { color: inherit; text-decoration: none; }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  /* Identifiers (phones, SKUs, tracking codes) stay LTR inside RTL text. */
+  .ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+  .brand-spectrum { background: linear-gradient(90deg, var(--color-brand-red), var(--color-brand-orange), var(--color-brand-amber), var(--color-brand-yellow)); }
+  .brand-spectrum-rtl { background: linear-gradient(270deg, var(--color-brand-red), var(--color-brand-orange), var(--color-brand-amber), var(--color-brand-yellow)); }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+  .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}

@@ -1,0 +1,80 @@
+flowchart TD
+    A[ثبت درخواست و استعلام قیمت] --> B[تأیید قیمت و ثبت سفارش]
+    B --> C[دریافت فایل از مشتری]
+    C --> D{نیاز به طراحی دارد؟}
+    D -- بله --> E[طراحی/اصلاح فایل توسط طراح]
+    E --> F[تأیید نهایی فایل]
+    D -- خیر --> F[تأیید نهایی فایل]
+
+    F --> G1[آماده‌سازی فایل چاپ - پری‌پرس]
+    F --> G2[بررسی/تأمین کاغذ]
+    F --> G3[بررسی/تأمین زینک]
+
+    G1 --> H{همه موارد آماده‌اند؟}
+    G2 --> H
+    G3 --> H
+
+    H -- خیر، منتظر بمان --> H
+    H -- بله --> I[ورود به صف تولید]
+
+    I --> J[چاپ]
+    J --> K{QC چاپ}
+    K -- رد شد --> J
+    K -- تأیید شد --> L1{نیاز به سلفون / لمینیشن؟}
+
+    L1 -- بله --> L2[سلفون / لمینیشن]
+    L1 -- خیر --> M[برش]
+    L2 --> M
+
+    M --> N1{نیاز به پوشش UV؟}
+    N1 -- بله --> N2[پوشش UV موضعی/کامل]
+    N1 -- خیر --> N3
+    N2 --> N3{عملیات تکمیلی دیگر لازم است؟}
+    N3 -- بله --> N4[طلاکوب / برجسته‌کاری / قالب‌برش]
+    N3 -- خیر --> N5
+    N4 --> N5{نیاز به صحافی دارد؟}
+    N5 -- بله --> O[صحافی]
+    N5 -- خیر --> P{QC نهایی}
+    O --> P
+
+    P -- رد شد، نیاز به اصلاح --> Q[Rework]
+    Q --> J
+    P -- تأیید شد --> R[بسته‌بندی]
+
+    R --> S[آماده ارسال]
+    S --> T[ارسال به مشتری]
+    T --> U[تسویهٔ نهایی]
+    U --> V([سفارش بسته شد])
+
+    style A fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+    style B fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+    style C fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+    style D fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+    style E fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+    style F fill:#fdeef4,stroke:#C81E6B,stroke-width:1.5px
+
+    style G1 fill:#e6f6fb,stroke:#0092C7,stroke-width:1.5px
+    style G2 fill:#e6f6fb,stroke:#0092C7,stroke-width:1.5px
+    style G3 fill:#e6f6fb,stroke:#0092C7,stroke-width:1.5px
+    style H fill:#e6f6fb,stroke:#0092C7,stroke-width:1.5px
+
+    style I fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style J fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style K fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style L1 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style L2 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style M fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style N1 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style N2 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style N3 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style N4 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style N5 fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style O fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style P fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style Q fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+    style R fill:#fdf6e0,stroke:#D9A400,stroke-width:1.5px
+
+    style S fill:#eeeeee,stroke:#1C1B19,stroke-width:1.5px
+    style T fill:#eeeeee,stroke:#1C1B19,stroke-width:1.5px
+    style U fill:#eeeeee,stroke:#1C1B19,stroke-width:1.5px
+    style V fill:#1C1B19,stroke:#1C1B19,color:#fff,stroke-width:1.5px

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <defs>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#121214" flood-opacity=".18"/></filter>
+  </defs>
+  <g filter="url(#s)">
+    <circle cx="170" cy="170" r="84" fill="#FFFFFF"/>
+    <circle cx="170" cy="170" r="70" fill="#F26422"/>
+    <g transform="translate(140 140)"><path d="M0 28a28 28 0 0 1 28-28v28z" fill="#FFF301"/><path d="M32 0a28 28 0 0 1 28 28H32z" fill="#FDB913"/><path d="M0 32h28v28A28 28 0 0 1 0 32z" fill="#FFFFFF"/><path d="M32 32h28a28 28 0 0 1-28 28z" fill="#18181B"/></g>
+  </g>
+  <g filter="url(#s)" transform="rotate(10 320 200)">
+    <rect x="252" y="130" width="140" height="140" rx="30" fill="#FFFFFF"/>
+    <rect x="264" y="142" width="116" height="116" rx="22" fill="#18181B"/>
+    <rect x="290" y="186" width="64" height="10" rx="5" fill="#FDB913"/>
+    <rect x="300" y="204" width="44" height="7" rx="3.5" fill="#A1A1AA"/>
+    <path d="M392 230v10a30 30 0 0 1-30 30h-10c0-22 18-40 40-40z" fill="#EAEAE6"/>
+  </g>
+  <g filter="url(#s)"><path d="M330 70l10 22 24 3-18 16 5 24-21-12-21 12 5-24-18-16 24-3z" fill="#ED1D26"/></g>
+</svg>
