@@ -1,4 +1,5 @@
 /** Thin client for /api/v1. Throws ApiError with the server's user-facing message. */
+import { withBase } from "./base-path";
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -21,7 +22,7 @@ export function surfaceHeaders(): Record<string, string> {
 }
 
 export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown; form?: FormData; signal?: AbortSignal } = {}): Promise<T> {
-  const res = await fetch(`/api/v1/${path.replace(/^\//, "")}`, {
+  const res = await fetch(withBase(`/api/v1/${path.replace(/^\//, "")}`), {
     method: init.method ?? (init.body !== undefined || init.form ? "POST" : "GET"),
     headers: init.form ? surfaceHeaders() : { "Content-Type": "application/json", ...surfaceHeaders() },
     body: init.form ?? (init.body !== undefined ? JSON.stringify(init.body) : undefined),

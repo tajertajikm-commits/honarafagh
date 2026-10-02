@@ -49,6 +49,24 @@ if (!process.env.APP_URL) {
   process.env.APP_URL = `http://localhost:${process.env.PORT || 3000}`;
 }
 
+// Sub-path builds (e.g. /printing-demo): some hosts (Passenger) strip the prefix before the
+// request reaches the app, others don't. Accept both by restoring a missing prefix.
+const base = (process.env.NEXT_PUBLIC_BASE_PATH || require("./base-path.json").basePath || "").replace(/\/+$/, "");
+if (base) {
+  const http = require("node:http");
+  const createServer = http.createServer;
+  http.createServer = function (...args) {
+    const server = createServer.apply(this, args);
+    const listeners = server.listeners("request");
+    server.removeAllListeners("request");
+    server.on("request", (req, res) => {
+      if (req.url !== base && !req.url.startsWith(base + "/") && !req.url.startsWith(base + "?")) req.url = base + (req.url === "/" ? "" : req.url);
+      for (const l of listeners) l.call(server, req, res);
+    });
+    return server;
+  };
+}
+
 const { installSeed } = require("./seed-install.js");
 
 installSeed(root)

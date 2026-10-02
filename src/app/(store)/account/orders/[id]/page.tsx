@@ -14,6 +14,7 @@ import { balanceOf } from "@/server/modules/orders/state";
 import { ARTWORK_FILE_STATUS, INVOICE_TYPE, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS, PRODUCTION_TYPE, label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/persian";
+import { withBase } from "@/lib/base-path";
 
 export const metadata: Metadata = { title: "سفارش من" };
 
@@ -174,7 +175,7 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
               <ul className="divide-y divide-line">
                 {d.artwork.map((a) => (
                   <li key={a.artwork.id} className="flex items-center gap-2 px-5 py-2.5 text-[12.5px]">
-                    <a href={`/api/v1/files/${a.file.id}`} className="min-w-0 flex-1 truncate font-bold hover:underline" dir="auto">{a.file.name}</a>
+                    <a href={withBase(`/api/v1/files/${a.file.id}`)} className="min-w-0 flex-1 truncate font-bold hover:underline" dir="auto">{a.file.name}</a>
                     <span className="text-muted">{a.artwork.source === "DESIGNER" ? "طرح نهایی" : label(ARTWORK_FILE_STATUS, a.artwork.status)}</span>
                   </li>
                 ))}

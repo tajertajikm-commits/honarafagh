@@ -27,6 +27,7 @@ import { customerStatus } from "@/lib/order-status";
 import { APPROVAL_DECISION, ARTWORK_FILE_STATUS, ARTWORK_STATUS, INVOICE_TYPE, LITHO_STATUS, ORDER_KIND, ORDER_STATUS, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS, PRODUCTION_TYPE, SHIPPING_METHOD, STEP_STATUS, label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
 import { formatNumber, formatPhone } from "@/lib/persian";
+import { withBase } from "@/lib/base-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   return { title: `سفارش ${decodeURIComponent((await params).code)}` };
@@ -277,7 +278,7 @@ function Files({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
                   {a.reviewNote && <p className={cn("mt-0.5 text-[12.5px]", a.status === "REJECTED" ? "text-danger" : "text-ink-2")}>{a.reviewNote}</p>}
                 </div>
                 <Status map={ARTWORK_FILE_STATUS} value={a.status} />
-                <a href={`/api/v1/files/${file.id}`} className="grid size-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-ink" aria-label="دانلود"><Download className="size-4" /></a>
+                <a href={withBase(`/api/v1/files/${file.id}`)} className="grid size-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-ink" aria-label="دانلود"><Download className="size-4" /></a>
                 {a.status === "UPLOADED" && a.source === "CUSTOMER" && can(ctx, "artwork.review") && open && <ArtworkReview artworkId={a.id} />}
               </li>
             ))}

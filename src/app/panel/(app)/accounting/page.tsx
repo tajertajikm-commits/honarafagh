@@ -13,6 +13,7 @@ import { requireStaffPage } from "@/server/http/session";
 import { accountingOrders, accountingSummary, invoiceList, paymentLedger, type AccountingFilter } from "@/server/modules/finance/queries";
 import { CUSTOMER_TYPE, INVOICE_TYPE, ORDER_STATUS, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS } from "@/lib/labels";
 import { formatNumber } from "@/lib/persian";
+import { withBase } from "@/lib/base-path";
 
 export const metadata: Metadata = { title: "حسابداری و فاکتور" };
 
@@ -123,7 +124,7 @@ async function Payments({ ctx }: { ctx: Parameters<typeof paymentLedger>[0] }) {
                 <span>{customerName}</span>
                 <span className="font-bold"><Money rial={p.amount} /></span>
                 <span className="text-muted">{PAYMENT_METHOD[p.method]}{p.reference ? ` • ${p.reference}` : ""}</span>
-                {p.receiptFileId && <a href={`/api/v1/files/${p.receiptFileId}?inline=1`} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">رسید</a>}
+                {p.receiptFileId && <a href={withBase(`/api/v1/files/${p.receiptFileId}?inline=1`)} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">رسید</a>}
                 {can(ctx, "payment.record") && (
                   <span className="ms-auto flex gap-2">
                     <ActionButton path={`payments/${p.id}/approve`} success="پرداخت تأیید شد." size="sm">تأیید</ActionButton>

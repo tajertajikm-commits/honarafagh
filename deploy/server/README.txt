@@ -8,19 +8,24 @@
 نیازمندی: هاست با Node.js نسخه ۲۰ یا بالاتر (در cPanel: «Setup Node.js App»).
 
 نصب در cPanel
-1. یک ساب‌دامین بسازید، مثلاً demo.yourdomain.com (سامانه باید در ریشه دامنه باشد).
-2. فایل honarafagh-server.zip را در File Manager آپلود و Extract کنید
-   (مثلاً در پوشه ~/honarafagh-server ؛ بیرون از public_html).
-3. Setup Node.js App → Create Application:
+0. مهم: اگر قبلاً نسخه نمایشی قدیمی (فایل‌های استاتیک) را در public_html/printing-demo گذاشته‌اید،
+   آن پوشه را کامل پاک کنید (یا تغییر نام دهید). وگرنه سرور همان فایل‌های قدیمی را نشان می‌دهد.
+   این بسته نباید داخل public_html باشد.
+1. فایل honarafagh-server.zip را در File Manager، در پوشه خانگی (کنار public_html، نه داخل آن)
+   آپلود و Extract کنید → پوشه ~/honarafagh-server ساخته می‌شود.
+2. Setup Node.js App → Create Application:
      Node.js version: 20 یا بالاتر
      Application mode: Production
      Application root: honarafagh-server
-     Application URL: demo.yourdomain.com
+     Application URL: دامنه را انتخاب کنید و در کادر کنارش بنویسید printing-demo
      Application startup file: app.js
-   در بخش Environment variables اضافه کنید:
-     APP_URL = https://demo.yourdomain.com
-4. Start / Restart را بزنید و سایت را باز کنید. اولین اجرا چند ثانیه طول می‌کشد.
+3. Create و سپس Start / Restart را بزنید و سایت را باز کنید. اولین اجرا چند ثانیه طول می‌کشد.
    (نیازی به «Run NPM Install» نیست؛ همه وابستگی‌ها داخل بسته است.)
+
+این بسته برای آدرس داخل فایل config.env ساخته شده (APP_URL). مسیر /printing-demo هنگام
+ساخت داخل برنامه قرار گرفته است؛ برای آدرس دیگر باید بسته دوباره ساخته شود:
+  node scripts/build-server-package.mjs --base=/مسیر --app-url=https://دامنه/مسیر
+(بدون --base برای ریشه دامنه یا ساب‌دامین.)
 
 نصب روی سرور (VPS)
    cd honarafagh-server && APP_URL=https://demo.yourdomain.com PORT=3000 node app.js
