@@ -27,12 +27,21 @@ Demo staff (placeholder phones): 01 Hamed Noorsalehi (manager), 02 Labafi (digit
 03 Azad (digital operator), 04 Hossein Abdali (accountant), 05 Gholipour (lithography & offset),
 06 Mojtaba Hajghasemi (offset production), 07 Memarian (design). See [permissions](docs/permissions.md).
 
+### Shared live demo (one link for everyone)
+
+[`demo-dist/honarafagh-server.zip`](demo-dist/honarafagh-server.zip) is the full app as one
+Node.js folder with an embedded PostgreSQL (PGlite) and the seeded demo data. No database
+server is needed. Upload it to any host with Node.js 20+ (cPanel «Setup Node.js App», startup
+file `app.js`, set `APP_URL`) and everyone who opens the link works on the same data: the client
+places an order, staff move it forward in other tabs or devices. Instructions in Persian are in
+`README.txt` inside the zip. Rebuild it with `node scripts/build-server-package.mjs`.
+
 ### Static demo (no server)
 
 [`demo-dist/printing-house-demo.zip`](demo-dist/printing-house-demo.zip) is a self-contained demo of
 the whole platform that runs in the browser (PostgreSQL as WebAssembly, stored in
 IndexedDB). Extract it into `public_html/printing-demo/` and open `https://your-domain/printing-demo/`:
-no database, Node.js or API keys needed. See [docs/static-demo.md](docs/static-demo.md).
+no database, Node.js or API keys needed, but each browser keeps its own data. See [docs/static-demo.md](docs/static-demo.md).
 
 ## Scripts
 

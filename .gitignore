@@ -15,3 +15,5 @@ storage-test/
 
 # static demo build output (the ZIP in demo-dist/ is committed)
 demo/.build/
+/.data
+/.build-server

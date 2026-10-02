@@ -9,8 +9,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // `NEXT_OUTPUT=standalone` builds the self-contained server package (scripts/build-server-package.mjs).
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   typedRoutes: false,
-  serverExternalPackages: ["pg"],
+  serverExternalPackages: ["pg", "@electric-sql/pglite"],
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

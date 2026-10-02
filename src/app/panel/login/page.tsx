@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
+import { DemoAccounts } from "@/components/panel/demo-accounts";
 import { StaffLogin } from "@/components/panel/staff-login";
 import { env } from "@/server/config/env";
 import { getStaffActor } from "@/server/http/session";
@@ -19,17 +20,10 @@ export default async function StaffLoginPage() {
         <p className="mt-2 text-[14px] text-muted">با شماره موبایل و رمز عبور سازمانی وارد شوید.</p>
         <StaffLogin />
         {demo && (
-          <div className="mt-8 max-w-sm rounded-2xl border border-dashed border-line-strong bg-surface p-4">
+          <div className="mt-8 max-w-md rounded-2xl border border-dashed border-line-strong bg-surface p-4">
             <p className="text-[13px] font-bold">حساب‌های نمایشی</p>
-            <p className="mt-1 text-[12px] text-muted">رمز همه: <bdi dir="ltr" className="font-bold text-ink">{DEMO_STAFF_PASSWORD}</bdi></p>
-            <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
-              {EMPLOYEES.map((e) => (
-                <li key={e.code} className="flex justify-between gap-2">
-                  <span className="truncate text-ink-2">{e.title}</span>
-                  <bdi dir="ltr" className="tabular text-muted" data-demo-phone={e.phone}>{e.phone}</bdi>
-                </li>
-              ))}
-            </ul>
+            <p className="mt-1 text-[12px] text-muted">برای ورود روی هر نفر بزنید. رمز همه: <bdi dir="ltr" className="font-bold text-ink">{DEMO_STAFF_PASSWORD}</bdi></p>
+            <DemoAccounts password={DEMO_STAFF_PASSWORD} accounts={EMPLOYEES.map((e) => ({ phone: e.phone, name: e.fullName, title: e.title }))} />
           </div>
         )}
       </div>

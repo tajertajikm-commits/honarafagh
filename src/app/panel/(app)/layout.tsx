@@ -3,6 +3,8 @@ import { Topbar } from "@/components/panel/topbar";
 import { visibleNav } from "@/components/panel/nav";
 import { requireStaffPage } from "@/server/http/session";
 import { myWork } from "@/server/modules/queues/service";
+import { env } from "@/server/config/env";
+import { DEMO_STAFF_PASSWORD, EMPLOYEES } from "@/server/seed/reference";
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireStaffPage();
@@ -15,7 +17,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         <Sidebar sections={sections} badges={badges} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={{ name: ctx.actor.name, roles: [...ctx.actor.roleNames] }} sections={sections} badges={badges} />
+        <Topbar user={{ name: ctx.actor.name, roles: [...ctx.actor.roleNames] }} sections={sections} badges={badges} demo={env().DEMO_MODE ? { password: DEMO_STAFF_PASSWORD, accounts: EMPLOYEES.map((e) => ({ phone: e.phone, name: e.fullName, title: e.title })) } : undefined} />
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>

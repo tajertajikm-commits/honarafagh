@@ -22,7 +22,8 @@ export default defineConfig({
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } }, grepInvert: /@mobile/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, grep: /@mobile/ },
   ],
-  webServer: {
+  // With E2E_BASE_URL the tests target an already running server (e.g. the packaged build).
+  webServer: process.env.E2E_BASE_URL ? undefined : {
     command: "pnpm start",
     url: "http://localhost:3000",
     reuseExistingServer: true,

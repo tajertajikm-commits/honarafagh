@@ -7,7 +7,7 @@ is the complete, commented template. **Never commit real secrets.**
 | Variable | Default | Required when | Purpose |
 |---|---|---|---|
 | `NODE_ENV` | `development` | | `production` enables secure cookies and the production checks below |
-| `DATABASE_URL` | `postgres://honar:honar@localhost:5432/honar` | always in production | PostgreSQL connection string |
+| `DATABASE_URL` | `postgres://honar:honar@localhost:5432/honar` | always in production | PostgreSQL connection string, or `pglite:<dir>` for the embedded database (single server) |
 | `APP_URL` | `http://localhost:3000` | production | Public base URL: payment callbacks and links in SMS |
 | `SESSION_SECRET` | dev placeholder | **production** (≥ 32 chars) | HMAC key for OTP hashes. Production rejects the placeholder. Generate with `openssl rand -base64 48` |
 | `DEMO_MODE` | `false` | | Shows demo hints; allows fake OTP/payment providers in production |

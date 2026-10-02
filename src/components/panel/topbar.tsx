@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, Popover } from "radix-ui";
-import { Bell, LogOut, Menu, Search, Store } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Store, UserRoundCog } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ThemeSwitch } from "@/components/brand/theme";
 import { Sheet } from "@/components/ui/dialog";
@@ -17,7 +17,7 @@ import { Sidebar } from "./sidebar";
 
 interface Notice { id: string; title: string; body: string; link: string | null; readAt: string | null; createdAt: string }
 
-export function Topbar({ user, sections, badges }: { user: { name: string; roles: string[] }; sections: { title: string; items: NavItem[] }[]; badges?: Record<string, number> }) {
+export function Topbar({ user, sections, badges, demo }: { user: { name: string; roles: string[] }; sections: { title: string; items: NavItem[] }[]; badges?: Record<string, number>; demo?: { password: string; accounts: { phone: string; name: string; title: string }[] } }) {
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -57,9 +57,9 @@ export function Topbar({ user, sections, badges }: { user: { name: string; roles
       </Sheet>
 
       <button onClick={() => setSearchOpen(true)} className="flex h-10 w-full max-w-md items-center gap-2.5 rounded-lg border border-line bg-surface px-3 text-[13.5px] text-subtle shadow-soft transition-colors hover:border-line-strong">
-        <Search className="size-4" />
-        <span className="flex-1 text-start">کد سفارش (O-1042-0019)، کد مشتری (CUS-1042)، نام یا موبایل…</span>
-        <span className="hidden items-center gap-1 sm:flex"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
+        <Search className="size-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-start">جستجوی سفارش، مشتری یا موبایل…</span>
+        <span className="hidden shrink-0 items-center gap-1 sm:flex" dir="ltr"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
       </button>
       <CommandSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
@@ -97,12 +97,32 @@ export function Topbar({ user, sections, badges }: { user: { name: string; roles
             </span>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-60 animate-rise rounded-xl border border-line bg-surface p-1.5 shadow-float">
+            <DropdownMenu.Content align="end" sideOffset={8} className="scrollbar-thin z-50 max-h-[80dvh] w-64 animate-rise overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-float">
               <div className="flex items-center justify-between px-2.5 py-2">
                 <span className="text-[12.5px] text-muted">نمایش</span>
                 <ThemeSwitch />
               </div>
               <DropdownMenu.Separator className="my-1 h-px bg-line" />
+              {demo && (
+                <>
+                  <p className="flex items-center gap-1.5 px-2.5 pb-1 pt-1.5 text-[11.5px] font-bold text-muted"><UserRoundCog className="size-3.5" /> ورود به‌عنوان (حالت نمایشی)</p>
+                  {demo.accounts.filter((a) => a.name !== user.name).map((a) => (
+                    <DropdownMenu.Item
+                      key={a.phone}
+                      onSelect={async () => {
+                        await api("staff/auth/login", { body: { phone: a.phone, password: demo.password } });
+                        router.push("/panel");
+                        router.refresh();
+                      }}
+                      className="flex cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 outline-none data-[highlighted]:bg-surface-2"
+                    >
+                      <span className="text-[13px] font-bold">{a.name}</span>
+                      <span className="text-[11.5px] text-muted">{a.title}</span>
+                    </DropdownMenu.Item>
+                  ))}
+                  <DropdownMenu.Separator className="my-1 h-px bg-line" />
+                </>
+              )}
               <DropdownMenu.Item asChild>
                 <Link href="/" className="flex h-9 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[13px] outline-none data-[highlighted]:bg-surface-2"><Store className="size-4 text-muted" /> مشاهده فروشگاه</Link>
               </DropdownMenu.Item>

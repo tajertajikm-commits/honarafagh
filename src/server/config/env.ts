@@ -8,7 +8,7 @@ const bool = z
 const schema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    DATABASE_URL: z.string().url().default("postgres://honar:honar@localhost:5432/honar"),
+    DATABASE_URL: z.string().refine((v) => v.startsWith("pglite:") || URL.canParse(v), "postgres://… or pglite:<dir>").default("postgres://honar:honar@localhost:5432/honar"),
     APP_URL: z.string().url().default("http://localhost:3000"),
     SESSION_SECRET: z.string().min(32).default("dev-only-insecure-session-secret-change-me-please"),
     DEMO_MODE: bool,

@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { closeDb, getDb } from "@/server/db/client";
+import { closeDb, getDb, migrateDb } from "@/server/db/client";
 
 /** Drops everything and re-applies migrations. Refuses to run in production. */
 async function main() {
@@ -9,7 +8,7 @@ async function main() {
   await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`);
   await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`);
   await db.execute(sql`CREATE SCHEMA public`);
-  await migrate(db, { migrationsFolder: "./drizzle" });
+  await migrateDb();
   console.info("[reset] database recreated");
 }
 

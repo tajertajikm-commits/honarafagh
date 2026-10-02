@@ -23,6 +23,15 @@ version, 7 roles and the 7 staff members, shipping methods, notification templat
 invoice settings) and a demo scenario: 6 customers and about 23 orders covering every stage of
 both the Digital and Offset flows, built through the real services.
 
+## Single-server mode (embedded database)
+
+`DATABASE_URL=pglite:./data/db` runs PostgreSQL embedded in the app process (PGlite),
+persisted to that folder. Migrations and seed work the same (`pnpm db:migrate`, `pnpm db:seed`).
+Only one process may open the folder: keep `WORKER_INLINE=true` and stop the app before running
+scripts. Suitable for the shared demo and a small installation. Use a real PostgreSQL server
+for production at scale. `node scripts/build-server-package.mjs` builds the ready-to-upload
+package (`demo-dist/honarafagh-server.zip`).
+
 ## Production
 
 1. Provision PostgreSQL 16 (with `pg_trgm`, created by migration 0000) and persistent storage for uploads, or S3.

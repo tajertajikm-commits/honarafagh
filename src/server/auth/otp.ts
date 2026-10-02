@@ -18,9 +18,11 @@ const codeHash = (phone: string, code: string) => hmac(`otp:${phone}:${code}`);
 export async function requestOtp(db: Executor, rawPhone: string, ip?: string) {
   const phone = normalizePhone(rawPhone);
   if (!phone) throw validation("شماره موبایل معتبر نیست.");
-  await enforceRateLimit(db, `otp:phone:${phone}`, 1, 60, "برای دریافت کد جدید یک دقیقه صبر کنید.");
-  await enforceRateLimit(db, `otp:phone-hour:${phone}`, 6, 3600);
-  if (ip) await enforceRateLimit(db, `otp:ip:${ip}`, 30, 3600);
+  // Demo mode (fake SMS, code shown on screen): short cooldown so a live walkthrough never stalls.
+  const demo = env().DEMO_MODE && env().OTP_PROVIDER === "fake";
+  await enforceRateLimit(db, `otp:phone:${phone}`, 1, demo ? 5 : 60, demo ? "چند ثانیه صبر کنید." : "برای دریافت کد جدید یک دقیقه صبر کنید.");
+  await enforceRateLimit(db, `otp:phone-hour:${phone}`, demo ? 120 : 6, 3600);
+  if (ip) await enforceRateLimit(db, `otp:ip:${ip}`, demo ? 600 : 30, 3600);
 
   const code = String(randomInt(0, 10 ** CODE_LENGTH)).padStart(CODE_LENGTH, "0");
   await db.insert(otpChallenges).values({

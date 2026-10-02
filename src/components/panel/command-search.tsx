@@ -46,7 +46,7 @@ export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenCha
                 if (e.key === "ArrowUp") setActive((a) => Math.max(0, a - 1));
                 if (e.key === "Enter" && hits[active]) go(hits[active]);
               }}
-              placeholder="O-1042-0019 یا CUS-1042، نام، شرکت یا موبایل…"
+              placeholder="کد سفارش، CUS-1042، نام یا موبایل…"
               className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-subtle"
               aria-label="جستجو"
             />

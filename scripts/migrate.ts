@@ -1,8 +1,7 @@
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { closeDb, getDb } from "@/server/db/client";
+import { closeDb, migrateDb } from "@/server/db/client";
 
 async function main() {
-  await migrate(getDb(), { migrationsFolder: "./drizzle" });
+  await migrateDb();
   console.info("[migrate] database is up to date");
 }
 
