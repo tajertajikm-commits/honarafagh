@@ -15,7 +15,7 @@ async function loginCustomer(page: Page, phone: string, next = "/account") {
   await page.getByLabel("کد تأیید").fill(code);
 }
 
-test("customer: browse → configure → cart → checkout → pay → track", async ({ page }) => {
+test("store purchase: browse → configure → cart → checkout → pay online", async ({ page }) => {
   const phone = `0937${Math.floor(1_000_000 + Math.random() * 8_999_999)}`;
 
   // Browse & configure
@@ -49,10 +49,9 @@ test("customer: browse → configure → cart → checkout → pay → track", a
   await page.getByRole("button", { name: /ذخیره و ادامه/ }).click();
   await expect(page).toHaveURL(/\/checkout/);
 
-  // Checkout: courier + new address, pay deposit
+  // Checkout: courier + new address, pay online
   await page.getByRole("radio", { name: /پیک هنر آفاق/ }).click();
   await page.getByPlaceholder("خیابان، کوچه، پلاک، واحد").fill("خیابان انقلاب، پلاک ۱۰، واحد ۲");
-  await page.getByRole("radio", { name: /^پیش‌پرداخت/ }).click();
   await shot(page, "03-checkout");
   await page.getByRole("button", { name: "ثبت و پرداخت" }).click();
 
@@ -62,31 +61,15 @@ test("customer: browse → configure → cart → checkout → pay → track", a
   await expect(page.getByRole("heading", { name: "پرداخت با موفقیت انجام شد" })).toBeVisible();
   await page.getByRole("link", { name: "مشاهده سفارش" }).click();
 
-  // Order page: auto-confirmed after deposit; upload artwork
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
-  await expect(page.getByText("پرداخت بخشی").first()).toBeVisible();
-  await expect(page.getByText("تأیید شده").first()).toBeVisible();
-  await page.locator('input[type="file"]').first().setInputFiles({ name: "card.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%demo\n%%EOF") });
-  await page.getByRole("button", { name: "ارسال فایل برای بررسی" }).click();
-  await expect(page.getByText("در حال بررسی").first()).toBeVisible();
-  await expect(page.getByText("ثبت سفارش").first()).toBeVisible();
+  // Order page: paid, waiting for the printing house's approval
+  await expect(page.getByText("در انتظار تأیید").first()).toBeVisible();
+  await expect(page.getByText(/[DO]-\d+-\d+/).first()).toBeVisible();
   await shot(page, "04-order");
-
-  // Public tracking works without login
-  const heading = await page.getByRole("heading", { name: /سفارش #/ }).innerText();
-  const number = heading.replace(/[^\d۰-۹]/g, "").replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-  await page.context().clearCookies();
-  await page.goto("/track");
-  await page.getByLabel("شماره سفارش").fill(number);
-  await page.getByLabel("موبایل").fill(phone);
-  await page.getByRole("button", { name: "پیگیری" }).click();
-  await expect(page.getByLabel("مراحل سفارش")).toBeVisible();
-  await expect(page.getByText("ثبت سفارش")).toBeVisible();
 });
 
-test("customer: existing demo customer sees order history and a proof to approve @mobile", async ({ page }) => {
+test("customer: existing demo customer sees order history @mobile", async ({ page }) => {
   await loginCustomer(page, "09121111111");
   await expect(page).toHaveURL(/\/account/);
-  await expect(page.getByText(/سفارش #/).first()).toBeVisible();
+  await expect(page.getByText(/[DO]-\d+-\d+/).first()).toBeVisible();
   await shot(page, "05-account");
 });

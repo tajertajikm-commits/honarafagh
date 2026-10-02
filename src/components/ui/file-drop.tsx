@@ -13,7 +13,7 @@ export interface UploadedFile {
   mimeType: string;
 }
 
-type Purpose = "ARTWORK" | "PROOF" | "QC_IMAGE" | "DELIVERY_PROOF" | "ATTACHMENT" | "PRODUCT_IMAGE" | "PAYMENT_RECEIPT";
+type Purpose = "ARTWORK" | "DESIGN" | "ATTACHMENT" | "PRODUCT_IMAGE" | "PAYMENT_RECEIPT";
 
 /** Uploads with progress (XHR) to /api/v1/uploads. The server validates type by magic bytes. */
 function upload(file: File, purpose: Purpose, onProgress: (p: number) => void): Promise<UploadedFile> {

@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BadgeCheck, Boxes, Calculator, ChartColumn, Cog, Factory, Gauge, History, Layers, Package, Palette, Play, Receipt, Settings2, ShieldCheck, Tag, Truck, Users, Wallet, Warehouse, Workflow, type LucideIcon,
-} from "lucide-react";
+import { Calculator, Factory, Gauge, History, Inbox, Layers, Package, Printer, Receipt, Settings2, ShieldCheck, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/cn";
 import type { NavItem } from "./nav";
 
 const ICONS: Record<string, LucideIcon> = {
-  gauge: Gauge, play: Play, palette: Palette, "badge-check": BadgeCheck, tag: Tag, wallet: Wallet, warehouse: Warehouse, boxes: Boxes, truck: Truck,
-  receipt: Receipt, factory: Factory, cog: Cog, package: Package, users: Users, chart: ChartColumn, layers: Layers, calculator: Calculator, workflow: Workflow, shield: ShieldCheck, history: History, settings: Settings2,
+  inbox: Inbox, gauge: Gauge, printer: Printer, factory: Factory, receipt: Receipt, wallet: Wallet, users: Users, package: Package, truck: Truck,
+  layers: Layers, calculator: Calculator, shield: ShieldCheck, settings: Settings2, history: History,
 };
 
 export function Sidebar({ sections, badges, onNavigate }: { sections: { title: string; items: NavItem[] }[]; badges?: Record<string, number>; onNavigate?: () => void }) {

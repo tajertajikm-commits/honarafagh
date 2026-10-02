@@ -2,16 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
-import { Boxes, Loader2, Package, Receipt, Search, UserRound, Users } from "lucide-react";
+import { Loader2, Receipt, Search, Users } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { useDebouncedFetch } from "@/lib/use-debounced-fetch";
-import { toFaDigits } from "@/lib/persian";
 
-interface Hit { kind: "order" | "customer" | "product" | "employee" | "material"; id: string; title: string; subtitle: string; href: string }
-const ICON = { order: Receipt, customer: Users, product: Package, employee: UserRound, material: Boxes };
-const KIND = { order: "سفارش", customer: "مشتری", product: "محصول", employee: "کارمند", material: "کالا" };
+interface Hit { kind: "order" | "customer"; id: string; title: string; subtitle: string; href: string }
+const ICON = { order: Receipt, customer: Users };
+const KIND = { order: "سفارش", customer: "مشتری" };
 
 export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const router = useRouter();
@@ -47,7 +46,7 @@ export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenCha
                 if (e.key === "ArrowUp") setActive((a) => Math.max(0, a - 1));
                 if (e.key === "Enter" && hits[active]) go(hits[active]);
               }}
-              placeholder="شماره سفارش، نام یا موبایل مشتری، محصول، کالا، کارمند…"
+              placeholder="O-1042-0019 یا CUS-1042، نام، شرکت یا موبایل…"
               className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-subtle"
               aria-label="جستجو"
             />
@@ -62,7 +61,7 @@ export function CommandSearch({ open, onOpenChange }: { open: boolean; onOpenCha
                   <button onMouseEnter={() => setActive(i)} onClick={() => go(h)} className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start", i === active && "bg-surface-2")}>
                     <span className="grid size-8 place-items-center rounded-md bg-surface-2 text-ink-2"><Icon className="size-4" /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-bold">{toFaDigits(h.title)}</span>
+                      <span className="block truncate text-[14px] font-bold" dir="auto">{h.title}</span>
                       <span className="block truncate text-[12px] text-muted" dir="auto">{h.subtitle}</span>
                     </span>
                     <span className="text-[11.5px] text-subtle">{KIND[h.kind]}</span>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { KV, PageHeader } from "@/components/panel/page";
-import { BusinessSettingsForm, OrderSettingsForm } from "@/components/panel/settings-forms";
+import { BusinessSettingsForm, InvoiceSettingsForm } from "@/components/panel/settings-forms";
 import { env } from "@/server/config/env";
 import { requireStaffPage } from "@/server/http/session";
 import { getSetting } from "@/server/modules/settings/service";
@@ -25,20 +25,20 @@ function integrations() {
 export default async function SettingsPage() {
   const ctx = await requireStaffPage({ permission: "settings.manage" });
   const business = await getSetting(ctx.db, "business");
-  const orders = await getSetting(ctx.db, "orders");
+  const invoice = await getSetting(ctx.db, "invoice");
   const e = env();
   return (
     <>
-      <PageHeader title="تنظیمات" description="تقویم کاری، قواعد سفارش و وضعیت اتصال‌ها. همه تغییرات در گزارش ممیزی ثبت می‌شوند." />
+      <PageHeader title="تنظیمات" description="اطلاعات فروشنده روی فاکتور، مالیات و وضعیت اتصال‌ها. همه تغییرات در گزارش ممیزی ثبت می‌شوند." />
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
-          <CardHeader title="کسب‌وکار و تقویم کاری" description="تقویم کاری مبنای برنامه‌ریزی ظرفیت و موعد تحویل است." />
+          <CardHeader title="اطلاعات فروشنده" description="روی فاکتورهای رسمی و غیررسمی چاپ می‌شود." />
           <CardBody className="pt-0"><BusinessSettingsForm value={business} /></CardBody>
         </Card>
         <div className="space-y-6">
           <Card>
-            <CardHeader title="قواعد سفارش" />
-            <CardBody className="pt-0"><OrderSettingsForm value={orders} /></CardBody>
+            <CardHeader title="فاکتور" />
+            <CardBody className="pt-0"><InvoiceSettingsForm value={invoice} /></CardBody>
           </Card>
           <Card>
             <CardHeader title="اتصال‌ها" description="از طریق متغیرهای محیطی سرور پیکربندی می‌شوند." actions={e.DEMO_MODE ? <Badge tone="warning">حالت نمایشی</Badge> : null} />

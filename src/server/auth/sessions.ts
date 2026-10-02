@@ -53,7 +53,7 @@ export async function loadStaffActor(db: Executor, userId: string): Promise<Staf
     .limit(1);
   if (!emp || !emp.active) return null;
   const roleRows = await db
-    .select({ roleId: roles.id, code: roles.code, workspaces: roles.workspaces, stepTypes: roles.stepTypes })
+    .select({ roleId: roles.id, code: roles.code, name: roles.name })
     .from(employeeRoles)
     .innerJoin(roles, eq(roles.id, employeeRoles.roleId))
     .where(eq(employeeRoles.employeeId, emp.employeeId));
@@ -69,8 +69,7 @@ export async function loadStaffActor(db: Executor, userId: string): Promise<Staf
     name: emp.name,
     permissions,
     roleCodes: roleRows.map((r) => r.code),
-    workspaces: [...new Set(roleRows.flatMap((r) => r.workspaces))],
-    stepTypes: [...new Set(roleRows.flatMap((r) => r.stepTypes))],
+    roleNames: roleRows.map((r) => r.name),
   };
 }
 

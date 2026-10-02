@@ -6,9 +6,12 @@ import { env } from "@/server/config/env";
  * adapter only mirrors documents outward.
  */
 export interface InvoiceDocument {
+  invoiceId: string;
+  invoiceNumber: number;
+  type: "OFFICIAL" | "UNOFFICIAL";
   orderId: string;
-  orderNumber: number;
-  customer: { id: string; name: string; phone: string; nationalId?: string | null; economicCode?: string | null };
+  orderCode: string;
+  customer: { id: string; code: string; name: string; phone: string | null; nationalId?: string | null; economicCode?: string | null };
   issuedAt: string;
   lines: { title: string; quantity: number; unitPrice: number; amount: number }[];
   subtotal: number;
@@ -19,7 +22,7 @@ export interface InvoiceDocument {
 }
 export interface PaymentDocument {
   paymentId: string;
-  orderNumber: number;
+  orderCode: string;
   customerId: string;
   kind: "PAYMENT" | "REFUND";
   method: string;

@@ -61,7 +61,7 @@ export async function priceProduct(db: Executor, input: PriceInput): Promise<Pri
 // ── Rule-set administration (versioned) ─────────────────────────────────────
 
 export async function listRuleSets(ctx: Ctx) {
-  assertCan(ctx, "pricing.view");
+  assertCan(ctx, "catalog.manage");
   const sets = await ctx.db.select().from(pricingRuleSets).orderBy(asc(pricingRuleSets.name));
   const versions = sets.length
     ? await ctx.db
@@ -75,7 +75,7 @@ export async function listRuleSets(ctx: Ctx) {
 }
 
 export async function getRuleVersion(ctx: Ctx, versionId: string) {
-  assertCan(ctx, "pricing.view");
+  assertCan(ctx, "catalog.manage");
   const [v] = await ctx.db.select().from(pricingRuleVersions).where(eq(pricingRuleVersions.id, versionId)).limit(1);
   if (!v) throw notFound("نسخه قیمت‌گذاری");
   return v;
@@ -83,7 +83,7 @@ export async function getRuleVersion(ctx: Ctx, versionId: string) {
 
 /** Copies a version into a new DRAFT (the only editable state). */
 export async function createDraft(ctx: Ctx, fromVersionId: string, notes?: string) {
-  assertCan(ctx, "pricing.edit");
+  assertCan(ctx, "catalog.manage");
   return inTx(ctx, async (tx) => {
     const src = await getRuleVersion(tx, fromVersionId);
     const existingDraft = await tx.db
@@ -107,7 +107,7 @@ export async function createDraft(ctx: Ctx, fromVersionId: string, notes?: strin
 }
 
 export async function updateDraft(ctx: Ctx, versionId: string, data: unknown, notes?: string) {
-  assertCan(ctx, "pricing.edit");
+  assertCan(ctx, "catalog.manage");
   const parsed = pricingRulesSchema.safeParse(data);
   if (!parsed.success) throw validation("قوانین قیمت‌گذاری معتبر نیست.", parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
   return inTx(ctx, async (tx) => {
@@ -122,7 +122,7 @@ export async function updateDraft(ctx: Ctx, versionId: string, data: unknown, no
 
 /** Publishes a draft; the previous published version is archived. Old orders keep their snapshots. */
 export async function publishDraft(ctx: Ctx, versionId: string) {
-  assertCan(ctx, "pricing.publish");
+  assertCan(ctx, "catalog.manage");
   return inTx(ctx, async (tx) => {
     const [v] = await tx.db.select().from(pricingRuleVersions).where(eq(pricingRuleVersions.id, versionId)).for("update");
     if (!v) throw notFound("نسخه قیمت‌گذاری");
@@ -143,7 +143,7 @@ export async function publishDraft(ctx: Ctx, versionId: string) {
 }
 
 export async function discardDraft(ctx: Ctx, versionId: string) {
-  assertCan(ctx, "pricing.edit");
+  assertCan(ctx, "catalog.manage");
   return inTx(ctx, async (tx) => {
     const [v] = await tx.db.select().from(pricingRuleVersions).where(eq(pricingRuleVersions.id, versionId)).for("update");
     if (!v || v.status !== "DRAFT") throw invalidState("فقط پیش‌نویس قابل حذف است.");

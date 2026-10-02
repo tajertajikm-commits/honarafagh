@@ -3,7 +3,7 @@ import { z } from "zod";
 import { newToken } from "@/server/auth/tokens";
 import type { Ctx } from "@/server/core/context";
 import { addCartItem, cartView, findCart, getOrCreateCart, removeCartItem, updateCartItem } from "@/server/modules/orders/cart";
-import { checkout } from "@/server/modules/orders/service";
+import { checkout } from "@/server/modules/orders/create";
 import { startOnlinePayment } from "@/server/modules/finance/service";
 import { CART_COOKIE, cookieOptions } from "../cookies";
 import { api } from "../router";
@@ -86,15 +86,15 @@ export const cartRoutes = [
         note,
         expectedTotal: rial,
         idempotencyKey,
-        payment: z.enum(["FULL", "DEPOSIT", "LATER"]),
+        payment: z.enum(["NOW", "LATER"]),
       }),
     },
     async ({ ctx, body }) => {
-      const order = await checkout(ctx, { ...body, note: body.note ?? null });
-      if (body.payment === "LATER") return { orderId: order.id, number: order.number, redirectUrl: null };
-      const amount = body.payment === "DEPOSIT" ? Math.ceil((order.total * order.depositPct) / 100) : order.total;
-      const pay = await startOnlinePayment(ctx, order.id, { amount, idempotencyKey: body.idempotencyKey });
-      return { orderId: order.id, number: order.number, redirectUrl: pay.redirectUrl };
+      const r = await checkout(ctx, { ...body, note: body.note ?? null });
+      if (body.payment === "LATER") return { orders: r.orders, redirectUrl: null };
+      // One gateway trip per order; the first is paid now, others from the account page.
+      const pay = await startOnlinePayment(ctx, r.orders[0]!.id, { idempotencyKey: body.idempotencyKey });
+      return { orders: r.orders, redirectUrl: pay.redirectUrl };
     },
   ),
 ];

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { getDb } from "@/server/db/client";
 import { loadCustomerActor, loadStaffActor, resolveSession } from "@/server/auth/sessions";
-import type { Permission, Workspace } from "@/server/auth/permissions";
+import type { Permission } from "@/server/auth/permissions";
 import { type Ctx, createCtx, type CustomerActor, type StaffActor } from "@/server/core/context";
 import { CUSTOMER_COOKIE, STAFF_COOKIE } from "./cookies";
 
@@ -33,13 +33,12 @@ export function clientIp(h: Headers): string | undefined {
 }
 
 /** For panel pages: redirects to login when unauthenticated, 403-page when lacking access. */
-export async function requireStaffPage(opts: { permission?: Permission; anyOf?: Permission[]; workspace?: Workspace } = {}): Promise<Ctx & { actor: StaffActor }> {
+export async function requireStaffPage(opts: { permission?: Permission; anyOf?: Permission[] } = {}): Promise<Ctx & { actor: StaffActor }> {
   const actor = await getStaffActor();
   if (!actor) redirect("/panel/login");
   const denied =
     (opts.permission && !actor.permissions.has(opts.permission)) ||
-    (opts.anyOf && !opts.anyOf.some((p) => actor.permissions.has(p))) ||
-    (opts.workspace && !actor.workspaces.includes(opts.workspace));
+    (opts.anyOf && !opts.anyOf.some((p) => actor.permissions.has(p)));
   if (denied) redirect("/panel/forbidden");
   return createCtx(actor, await requestMeta()) as Ctx & { actor: StaffActor };
 }

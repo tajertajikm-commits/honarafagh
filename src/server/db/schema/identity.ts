@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   check,
   index,
   integer,
   jsonb,
   numeric,
+  pgSequence,
   pgTable,
   primaryKey,
   text,
@@ -25,6 +25,9 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 export { timestamps };
+
+/** Customer codes are shown as CUS-1042. */
+export const customerCodeSeq = pgSequence("customer_code_seq", { startWith: 1001 });
 
 /** A login identity. Phone numbers are stored normalized as 09xxxxxxxxx. */
 export const users = pgTable(
@@ -50,6 +53,10 @@ export const customers = pgTable(
   "customers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Stable customer number, displayed as CUS-{code}. */
+    code: integer("code").notNull().default(sql`nextval('customer_code_seq')`),
+    /** Last order sequence used in this customer's order codes (D-1042-0037). */
+    orderSeq: integer("order_seq").notNull().default(0),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     phone: varchar("phone", { length: 11 }).notNull(),
     fullName: text("full_name").notNull(),
@@ -57,17 +64,22 @@ export const customers = pgTable(
     companyName: text("company_name"),
     nationalId: varchar("national_id", { length: 11 }),
     economicCode: varchar("economic_code", { length: 16 }),
+    /** Company registration number (شماره ثبت) for official invoices. */
+    registrationNo: varchar("registration_no", { length: 20 }),
     email: text("email"),
+    /** Billing address used on invoices (shipping addresses live in `addresses`). */
+    billingAddress: text("billing_address"),
+    postalCode: varchar("postal_code", { length: 10 }),
     /** Standing discount percentage applied by the pricing engine (0–100). */
     discountPct: numeric("discount_pct", { precision: 5, scale: 2, mode: "number" }).notNull().default(0),
-    creditLimit: bigint("credit_limit", { mode: "number" }).notNull().default(0),
     notes: text("notes"),
     ...timestamps,
   },
   (t) => [
+    uniqueIndex("customers_code_uq").on(t.code),
     uniqueIndex("customers_phone_uq").on(t.phone),
     uniqueIndex("customers_user_uq").on(t.userId),
-    index("customers_name_trgm").using("gin", sql`${t.fullName} gin_trgm_ops`),
+    index("customers_name_idx").on(t.fullName),
     check("customers_discount_range", sql`${t.discountPct} >= 0 AND ${t.discountPct} <= 100`),
   ],
 );
@@ -101,8 +113,6 @@ export const employees = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     personnelCode: varchar("personnel_code", { length: 16 }).notNull(),
     title: text("title"),
-    /** Loaded labour cost per hour in rial, used by costing reports. */
-    hourlyCost: bigint("hourly_cost", { mode: "number" }).notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     ...timestamps,
   },
@@ -110,9 +120,8 @@ export const employees = pgTable(
 );
 
 /**
- * Roles are data, not code. A role grants permissions (backend-enforced actions),
- * workspaces (which UI surfaces the employee sees) and step capabilities
- * (which production step types the employee can pick up).
+ * Roles are data, not code: a role is a named set of permissions
+ * (see src/server/auth/permissions.ts). Navigation follows permissions.
  */
 export const roles = pgTable(
   "roles",
@@ -122,8 +131,6 @@ export const roles = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     isSystem: boolean("is_system").notNull().default(false),
-    workspaces: text("workspaces").array().notNull().default(sql`'{}'::text[]`),
-    stepTypes: text("step_types").array().notNull().default(sql`'{}'::text[]`),
     ...timestamps,
   },
   (t) => [uniqueIndex("roles_code_uq").on(t.code)],

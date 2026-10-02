@@ -6,15 +6,13 @@ import { AppError, conflict, invalidState, isUniqueViolation, notFound, validati
 import { audit } from "@/server/modules/audit/audit";
 import { emit } from "@/server/events/outbox";
 import { paymentProvider } from "@/server/integrations/payment";
-import { recomputeOrder, orderEvent } from "@/server/modules/orders/state";
-import { depositSatisfied, syncOrder } from "@/server/modules/production/engine";
-import { getSetting } from "@/server/modules/settings/service";
+import { balanceOf, orderEvent, recalcOrder } from "@/server/modules/orders/state";
 import { formatToman } from "@/lib/persian";
 
 type Payment = typeof payments.$inferSelect;
 type Method = Payment["method"];
 
-export const balanceOf = (o: Pick<typeof orders.$inferSelect, "total" | "paidAmount" | "refundedAmount">) => o.total - (o.paidAmount - o.refundedAmount);
+export { balanceOf };
 
 async function lockOrderFor(ctx: Ctx, orderId: string) {
   const [o] = await ctx.db.select().from(orders).where(eq(orders.id, orderId)).for("update");
@@ -34,15 +32,7 @@ async function applyConfirmed(ctx: Ctx, p: Payment) {
     await orderEvent(ctx, { orderId: p.orderId, domain: "PAYMENT", type: "REFUND", message: `بازپرداخت ${formatToman(p.amount)}`, visibleToCustomer: true });
     await emit(ctx, "PaymentRefunded", { type: "order", id: p.orderId }, { orderId: p.orderId, paymentId: p.id, amount: p.amount });
   }
-  const order = await recomputeOrder(ctx, p.orderId);
-  // Web orders are confirmed automatically once the deposit is in.
-  const settings = await getSetting(ctx.db, "orders");
-  if (p.kind === "PAYMENT" && order.status === "PENDING_REVIEW" && order.source === "WEBSITE" && settings.autoConfirmPaidWebOrders && depositSatisfied(order)) {
-    const { confirmOrder } = await import("@/server/modules/orders/service");
-    await confirmOrder({ ...ctx, actor: { kind: "system", name: "auto-confirm" } }, p.orderId);
-  } else {
-    await syncOrder(ctx, p.orderId);
-  }
+  await recalcOrder(ctx, p.orderId);
 }
 
 export const METHOD_LABEL: Record<Method, string> = {
@@ -57,17 +47,16 @@ export const METHOD_LABEL: Record<Method, string> = {
 // ── Online payments ─────────────────────────────────────────────────────────
 
 export async function startOnlinePayment(ctx: Ctx, orderId: string, input: { amount?: number; idempotencyKey: string }) {
-  if (ctx.actor.kind !== "customer") assertCan(ctx, "payment.create");
+  if (ctx.actor.kind !== "customer") assertCan(ctx, "payment.record");
   const provider = paymentProvider();
   const created = await inTx(ctx, async (tx) => {
     const o = await lockOrderFor(tx, orderId);
-    if (o.status === "CANCELLED") throw invalidState("سفارش لغو شده است.");
+    if (o.status === "CANCELLED" || o.status === "REJECTED") throw invalidState("این سفارش بسته شده است.");
+    if (!o.pricedAt) throw invalidState("مبلغ این سفارش هنوز تعیین نشده است.");
     const balance = balanceOf(o);
     if (balance <= 0) throw invalidState("این سفارش بدهی ندارد.");
-    const minDeposit = Math.max(0, Math.ceil((o.total * o.depositPct) / 100) - (o.paidAmount - o.refundedAmount));
     const amount = input.amount ?? balance;
     if (!Number.isInteger(amount) || amount <= 0 || amount > balance) throw validation("مبلغ پرداخت نامعتبر است.");
-    if (amount < Math.min(minDeposit, balance)) throw validation("مبلغ پرداخت کمتر از پیش‌پرداخت لازم است.");
     const [customer] = await tx.db.select({ phone: customers.phone }).from(customers).where(eq(customers.id, o.customerId));
     try {
       const [p] = await tx.db
@@ -86,7 +75,7 @@ export async function startOnlinePayment(ctx: Ctx, orderId: string, input: { amo
   const req = await provider.request({
     paymentId: created.payment.id,
     amountRial: created.payment.amount,
-    description: `سفارش ${created.order.number} — هنر آفاق`,
+    description: `سفارش ${created.order.code} — هنر آفاق`,
     callbackUrl: callbackUrl.toString(),
     mobile: created.phone,
   });
@@ -139,14 +128,14 @@ export async function recordManualPayment(
   if (isCustomer) {
     if (input.method !== "BANK_TRANSFER") throw validation("فقط ثبت رسید واریز برای مشتری مجاز است.");
     if (!input.receiptFileId) throw validation("تصویر رسید واریز را بارگذاری کنید.");
-  } else assertCan(ctx, "payment.create");
+  } else assertCan(ctx, "payment.record");
   if (!Number.isInteger(input.amount) || input.amount <= 0) throw validation("مبلغ نامعتبر است.");
   return inTx(ctx, async (tx) => {
     const o = await lockOrderFor(tx, orderId);
     if (o.status === "CANCELLED") throw invalidState("سفارش لغو شده است.");
     if (input.amount > balanceOf(o)) throw validation("مبلغ بیشتر از مانده حساب سفارش است.");
     // Cheques stay pending until cleared; everything else is confirmed directly by an approver.
-    const autoConfirm = !isCustomer && can(tx, "payment.approve") && input.method !== "CHEQUE";
+    const autoConfirm = !isCustomer && can(tx, "payment.record") && input.method !== "CHEQUE";
     let p: Payment;
     try {
       [p] = (await tx.db
@@ -181,7 +170,7 @@ export async function recordManualPayment(
 }
 
 export async function approvePayment(ctx: Ctx, paymentId: string) {
-  assertCan(ctx, "payment.approve");
+  assertCan(ctx, "payment.record");
   return inTx(ctx, async (tx) => {
     const [p] = await tx.db.select().from(payments).where(eq(payments.id, paymentId)).for("update");
     if (!p) throw notFound("پرداخت");
@@ -199,7 +188,7 @@ export async function approvePayment(ctx: Ctx, paymentId: string) {
 }
 
 export async function rejectPayment(ctx: Ctx, paymentId: string, reason: string) {
-  assertCan(ctx, "payment.approve");
+  assertCan(ctx, "payment.record");
   if (!reason.trim()) throw validation("دلیل رد الزامی است.");
   return inTx(ctx, async (tx) => {
     const [p] = await tx.db.select().from(payments).where(eq(payments.id, paymentId)).for("update");
@@ -213,7 +202,7 @@ export async function rejectPayment(ctx: Ctx, paymentId: string, reason: string)
 
 /** Records a refund (money is returned by bank transfer; gateway refunds are not automated). */
 export async function refundPayment(ctx: Ctx, orderId: string, input: { amount: number; method: Exclude<Method, "ONLINE" | "CREDIT">; reference?: string | null; reason: string; idempotencyKey: string }) {
-  assertCan(ctx, "payment.refund");
+  assertCan(ctx, "payment.record");
   if (!input.reason.trim()) throw validation("دلیل بازپرداخت الزامی است.");
   return inTx(ctx, async (tx) => {
     const o = await lockOrderFor(tx, orderId);
@@ -264,7 +253,7 @@ export async function assertPaymentOwner(ctx: Ctx, paymentId: string) {
 export async function pendingApprovals(ctx: Ctx) {
   assertCan(ctx, "payment.view");
   return ctx.db
-    .select({ payment: payments, orderNumber: orders.number, customerName: customers.fullName })
+    .select({ payment: payments, orderCode: orders.code, customerName: customers.fullName })
     .from(payments)
     .innerJoin(orders, eq(orders.id, payments.orderId))
     .innerJoin(customers, eq(customers.id, payments.customerId))

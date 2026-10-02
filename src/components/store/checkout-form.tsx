@@ -12,10 +12,10 @@ import { cn } from "@/lib/cn";
 import { formatNumber, normalizePhone, toEnDigits } from "@/lib/persian";
 import type { CartSummary } from "./cart-view";
 
-interface Method { id: string; name: string; description: string | null; kind: "PICKUP" | "INTERNAL" | "EXTERNAL"; fee: number }
+interface Method { id: string; name: string; description: string | null; method: "COURIER" | "POST" | "EXTERNAL" | "CUSTOMER_COURIER" | "PICKUP"; fee: number }
 interface Addr { id: string; title: string; line: string; recipientName: string; isDefault: boolean }
 
-export function CheckoutForm({ cart, methods, addresses, customer, depositPct }: { cart: CartSummary; methods: Method[]; addresses: Addr[]; customer: { name: string; phone: string }; depositPct: number }) {
+export function CheckoutForm({ cart, methods, addresses, customer }: { cart: CartSummary; methods: Method[]; addresses: Addr[]; customer: { name: string; phone: string } }) {
   const router = useRouter();
   const toast = useToast();
   const key = useRef(newIdempotencyKey());
@@ -23,18 +23,17 @@ export function CheckoutForm({ cart, methods, addresses, customer, depositPct }:
   const [addressId, setAddressId] = useState<string | "new">(addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? "new");
   const [addr, setAddr] = useState({ province: "تهران", city: "تهران", line: "", postalCode: "", recipientName: customer.name, recipientPhone: customer.phone });
   const [note, setNote] = useState("");
-  const [payment, setPayment] = useState<"FULL" | "DEPOSIT" | "LATER">("FULL");
+  const [payment, setPayment] = useState<"NOW" | "LATER">("NOW");
   const [loading, setLoading] = useState(false);
   const [expected, setExpected] = useState<number | null>(null);
 
   const method = methods.find((m) => m.id === methodId);
-  const needsAddress = method?.kind !== "PICKUP";
+  const needsAddress = method?.method !== "PICKUP" && method?.method !== "CUSTOMER_COURIER";
   const totals = useMemo(() => {
     const shipping = method?.fee ?? 0;
     const vat = Math.round(((cart.subtotal + shipping) * cart.vatPct) / 100);
     return { shipping, vat, total: cart.subtotal + shipping + vat };
   }, [cart, method]);
-  const deposit = Math.ceil((totals.total * depositPct) / 100);
 
   async function submit() {
     if (needsAddress && addressId === "new") {
@@ -44,7 +43,7 @@ export function CheckoutForm({ cart, methods, addresses, customer, depositPct }:
     }
     setLoading(true);
     try {
-      const r = await api<{ orderId: string; redirectUrl: string | null }>("checkout", {
+      const r = await api<{ orders: { id: string; code: string }[]; redirectUrl: string | null }>("checkout", {
         body: {
           deliveryMethodId: methodId,
           addressId: needsAddress && addressId !== "new" ? addressId : null,
@@ -57,7 +56,7 @@ export function CheckoutForm({ cart, methods, addresses, customer, depositPct }:
       });
       if (r.redirectUrl) window.location.href = r.redirectUrl;
       else {
-        router.push(`/account/orders/${r.orderId}?placed=1`);
+        router.push(r.orders.length === 1 ? `/account/orders/${r.orders[0]!.id}?placed=1` : "/account?placed=1");
         router.refresh();
       }
     } catch (e) {
@@ -75,7 +74,7 @@ export function CheckoutForm({ cart, methods, addresses, customer, depositPct }:
         <Section icon={<Truck />} title="روش تحویل">
           <div className="grid gap-2 sm:grid-cols-2">
             {methods.map((m) => (
-              <Choice key={m.id} active={methodId === m.id} onClick={() => setMethodId(m.id)} title={m.name} description={m.description} extra={m.fee ? <Money rial={m.fee} className="text-[12.5px]" /> : <span className="text-[12.5px] text-success">رایگان</span>} icon={m.kind === "PICKUP" ? <Store /> : <Truck />} />
+              <Choice key={m.id} active={methodId === m.id} onClick={() => setMethodId(m.id)} title={m.name} description={m.description} extra={m.fee ? <Money rial={m.fee} className="text-[12.5px]" /> : <span className="text-[12.5px] text-success">رایگان</span>} icon={m.method === "PICKUP" ? <Store /> : <Truck />} />
             ))}
           </div>
         </Section>
@@ -103,11 +102,8 @@ export function CheckoutForm({ cart, methods, addresses, customer, depositPct }:
 
         <Section icon={<CreditCard />} title="پرداخت">
           <div className="grid gap-2">
-            <Choice active={payment === "FULL"} onClick={() => setPayment("FULL")} title="پرداخت کامل آنلاین" extra={<Money rial={totals.total} className="text-[12.5px]" />} />
-            {depositPct > 0 && depositPct < 100 && (
-              <Choice active={payment === "DEPOSIT"} onClick={() => setPayment("DEPOSIT")} title={`پیش‌پرداخت ${formatNumber(depositPct)}٪ و تسویه هنگام تحویل`} extra={<Money rial={deposit} className="text-[12.5px]" />} />
-            )}
-            <Choice active={payment === "LATER"} onClick={() => setPayment("LATER")} title="پرداخت بعدی (کارت به کارت یا حضوری)" description="تولید پس از دریافت پیش‌پرداخت آغاز می‌شود." />
+            <Choice active={payment === "NOW"} onClick={() => setPayment("NOW")} title="پرداخت آنلاین" extra={<Money rial={totals.total} className="text-[12.5px]" />} />
+            <Choice active={payment === "LATER"} onClick={() => setPayment("LATER")} title="پرداخت بعدی (کارت به کارت یا حضوری)" description="رسید را از صفحه سفارش ثبت کنید؛ حسابداری تأیید می‌کند." />
           </div>
         </Section>
 

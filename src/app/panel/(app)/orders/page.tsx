@@ -1,97 +1,106 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Plus, Receipt } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { DateText, EmptyState, Money, OrderNo } from "@/components/ui/misc";
+import { Badge } from "@/components/ui/badge";
+import { CustomerCode, DateText, EmptyState, Money, OrderCode } from "@/components/ui/misc";
 import { Status } from "@/components/ui/status";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { FilterTabs, PageHeader } from "@/components/panel/page";
-import { Pagination } from "@/components/panel/pagination";
 import { SearchBox } from "@/components/panel/search-box";
-import { DELIVERY_STATUS, FILE_STATUS, ORDER_STATUS, PAYMENT_STATUS, PRIORITY, PRODUCTION_STATUS } from "@/lib/labels";
-import { formatNumber } from "@/lib/persian";
+import { PriorityFlag, TypeChip } from "@/components/panel/chips";
+import { can } from "@/server/core/context";
 import { requireStaffPage } from "@/server/http/session";
-import { listOrders } from "@/server/modules/orders/queries";
+import { listOrders, type OrderTab } from "@/server/modules/orders/queries";
+import { ARTWORK_STATUS, ORDER_STATUS, PAYMENT_STATUS } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "سفارش‌ها" };
 
-const TABS = [
-  { key: "open", label: "باز", status: ["PENDING_REVIEW", "CONFIRMED", "IN_PROGRESS", "ON_HOLD", "READY"] },
-  { key: "PENDING_REVIEW", label: "در انتظار بررسی", status: ["PENDING_REVIEW"] },
-  { key: "IN_PROGRESS", label: "در تولید", status: ["CONFIRMED", "IN_PROGRESS"] },
-  { key: "READY", label: "آماده تحویل", status: ["READY"] },
-  { key: "ON_HOLD", label: "متوقف", status: ["ON_HOLD"] },
-  { key: "late", label: "دارای تأخیر", status: [] },
-  { key: "COMPLETED", label: "تکمیل شده", status: ["COMPLETED"] },
-  { key: "CANCELLED", label: "لغو شده", status: ["CANCELLED"] },
-  { key: "all", label: "همه", status: [] },
-] as const;
-
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; q?: string; page?: string; late?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; type?: string }> }) {
+  const ctx = await requireStaffPage();
   const sp = await searchParams;
-  const ctx = await requireStaffPage({ permission: "order.view" });
-  const tabKey = sp.late ? "late" : (TABS.find((t) => t.key === sp.status)?.key ?? "open");
-  const tab = TABS.find((t) => t.key === tabKey)!;
-  const page = Number(sp.page ?? 1) || 1;
-  const { rows, total, pageSize } = await listOrders(ctx, { q: sp.q, status: tab.status.length ? [...tab.status] : undefined, late: tabKey === "late", page, pageSize: 25 });
-  const qs = (extra: Record<string, string | undefined>) => {
+  const tab = (["approval", "active", "ready", "closed", "all"].includes(sp.tab ?? "") ? sp.tab : "active") as OrderTab;
+  const type = sp.type === "DIGITAL" || sp.type === "OFFSET" ? sp.type : undefined;
+  const { rows, counts } = await listOrders(ctx, { tab, q: sp.q, type });
+  const qs = (patch: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q: sp.q, ...extra })) if (v) p.set(k, v);
+    const v = { tab, q: sp.q, type, ...patch };
+    for (const [k, x] of Object.entries(v)) if (x) p.set(k, x);
     return `/panel/orders?${p.toString()}`;
   };
   return (
-    <>
-      <PageHeader title="سفارش‌ها" description={`${formatNumber(total)} سفارش`} actions={ctx.actor.permissions.has("order.create") && <Button asChild size="sm"><Link href="/panel/sales/new"><Plus /> ثبت سفارش دستی</Link></Button>} />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <FilterTabs active={tabKey} tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: t.key === "late" ? qs({ late: "1" }) : qs({ status: t.key === "open" ? undefined : t.key }) }))} />
-        <SearchBox placeholder="شماره سفارش، نام یا موبایل مشتری" />
+    <div className="mx-auto max-w-7xl">
+      <PageHeader
+        title="سفارش‌ها"
+        description="جستجو با کد سفارش (O-1042-0019)، کد مشتری (CUS-1042)، نام یا موبایل."
+        actions={
+          can(ctx, "order.create") ? (
+            <Button asChild><Link href="/panel/orders/new"><Plus className="size-4" /> ثبت سفارش برای مشتری</Link></Button>
+          ) : undefined
+        }
+      />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="min-w-64 flex-1"><SearchBox placeholder="کد سفارش، کد مشتری، نام یا موبایل…" /></div>
+        <div className="flex gap-1 rounded-lg bg-surface-2 p-1 text-[13px] font-bold">
+          {[
+            [undefined, "همه"],
+            ["DIGITAL", "دیجیتال"],
+            ["OFFSET", "افست"],
+          ].map(([k, l]) => (
+            <Link key={l} href={qs({ type: k })} className={`rounded-md px-3 py-1.5 ${type === k ? "bg-surface shadow-soft" : "text-muted"}`}>{l}</Link>
+          ))}
+        </div>
       </div>
-      <Card className="overflow-hidden">
-        {rows.length === 0 ? (
-          <EmptyState icon={<Receipt />} title="سفارشی پیدا نشد" />
-        ) : (
+      <FilterTabs
+        active={tab}
+        tabs={[
+          { key: "approval", label: "منتظر تأیید", href: qs({ tab: "approval" }), count: counts.approval },
+          { key: "active", label: "در تولید", href: qs({ tab: "active" }), count: counts.active },
+          { key: "ready", label: "آماده و در حال ارسال", href: qs({ tab: "ready" }), count: counts.ready },
+          { key: "closed", label: "بسته‌شده", href: qs({ tab: "closed" }), count: counts.closed },
+          { key: "all", label: "همه", href: qs({ tab: "all" }), count: counts.all },
+        ]}
+      />
+      {rows.length === 0 ? (
+        <EmptyState title="سفارشی پیدا نشد" description={sp.q ? "عبارت دیگری را امتحان کنید." : undefined} />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
           <Table>
             <THead>
-              <tr>
+              <TR>
                 <TH>سفارش</TH>
                 <TH>مشتری</TH>
-                <TH>اقلام</TH>
                 <TH>وضعیت</TH>
-                <TH>پرداخت</TH>
                 <TH>فایل</TH>
-                <TH>تولید</TH>
-                <TH>ارسال</TH>
+                <TH>پرداخت</TH>
                 <TH className="text-end">مبلغ</TH>
-                <TH>موعد</TH>
-              </tr>
+                <TH>ثبت</TH>
+              </TR>
             </THead>
             <TBody>
-              {rows.map(({ order: o, customerName, companyName, items }) => {
-                const late = o.dueDate && o.dueDate < new Date() && !["READY", "COMPLETED", "CANCELLED"].includes(o.status);
-                return (
-                  <TR key={o.id} className="cursor-pointer">
-                    <TD>
-                      <Link href={`/panel/orders/${o.id}`} className="font-bold hover:text-accent-ink"><OrderNo n={o.number} /></Link>
-                      {o.priority !== "NORMAL" && <Status map={PRIORITY} value={o.priority} className="ms-2" />}
-                    </TD>
-                    <TD><span className="font-bold">{customerName}</span>{companyName && <span className="block text-[12px] text-muted">{companyName}</span>}</TD>
-                    <TD className="max-w-[220px]"><span className="line-clamp-2 text-[12.5px] text-ink-2">{items.map((i) => `${i.title} (${formatNumber(i.quantity)})`).join("، ")}</span></TD>
-                    <TD><Status map={ORDER_STATUS} value={o.status} /></TD>
-                    <TD><Status map={PAYMENT_STATUS} value={o.paymentStatus} /></TD>
-                    <TD><Status map={FILE_STATUS} value={o.fileStatus} /></TD>
-                    <TD><Status map={PRODUCTION_STATUS} value={o.productionStatus} /></TD>
-                    <TD><Status map={DELIVERY_STATUS} value={o.deliveryStatus} /></TD>
-                    <TD className="text-end"><Money rial={o.total} /></TD>
-                    <TD className={late ? "font-bold text-danger" : "text-muted"}><DateText value={o.dueDate} /></TD>
-                  </TR>
-                );
-              })}
+              {rows.map(({ order: o, customerName, customerCode, companyName }) => (
+                <TR key={o.id} className={o.isPriority ? "bg-danger-soft/30" : undefined}>
+                  <TD>
+                    <Link href={`/panel/orders/${o.code}`} className="block hover:underline">
+                      <span className="flex items-center gap-1.5"><OrderCode code={o.code} /> <TypeChip type={o.productionType} className="h-5 text-[11px]" /> {o.isPriority && <PriorityFlag compact className="h-5" />}</span>
+                      <span className="block max-w-72 truncate text-[12.5px] text-muted">{o.title}</span>
+                    </Link>
+                  </TD>
+                  <TD>
+                    <span className="block text-[13px] font-bold">{companyName || customerName}</span>
+                    <CustomerCode code={customerCode} className="text-[11.5px] text-muted" />
+                  </TD>
+                  <TD><Status map={ORDER_STATUS} value={o.status} /></TD>
+                  <TD><Status map={ARTWORK_STATUS} value={o.artworkStatus} /></TD>
+                  <TD>{o.pricedAt ? <Status map={PAYMENT_STATUS} value={o.paymentStatus} /> : <Badge tone="warning">بدون قیمت</Badge>}</TD>
+                  <TD className="text-end">{o.pricedAt ? <Money rial={o.total} /> : "—"}</TD>
+                  <TD><DateText value={o.createdAt} relative className="text-[12.5px] text-muted" /></TD>
+                </TR>
+              ))}
             </TBody>
           </Table>
-        )}
-        <Pagination page={page} pageSize={pageSize} total={total} href={(p) => qs({ status: sp.status, late: sp.late, page: String(p) })} />
-      </Card>
-    </>
+        </div>
+      )}
+    </div>
   );
 }

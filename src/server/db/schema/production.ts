@@ -1,226 +1,219 @@
 import { sql } from "drizzle-orm";
-import {
-  boolean,
-  check,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from "drizzle-orm/pg-core";
-import type { Gate } from "@/server/modules/workflow/types";
-import { machineTypes, stepTypes, workflowTemplates } from "./catalog";
-import { defectSeverity, issueStatus, issueType, jobStatus, qcResult, taskStatus } from "./enums";
+import { bigint, bigserial, boolean, check, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { lithoStatus, machineCategory, qualityDecision, stepStatus, stockMovementReason } from "./enums";
 import { employees, timestamps, users } from "./identity";
-import { machines } from "./inventory";
-import { orderItems, orders } from "./orders";
+import { orders } from "./orders";
 
-/** One production job per order item; rework is modelled as new task attempts. */
-export const productionJobs = pgTable(
-  "production_jobs",
+const money = (name: string) => bigint(name, { mode: "number" });
+const qty = (name: string) => numeric(name, { precision: 14, scale: 3, mode: "number" });
+
+// ── Machines ────────────────────────────────────────────────────────────────
+
+/** Offset presses (1/4/8 colour) and digital printers. */
+export const machines = pgTable(
+  "machines",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    number: integer("number").notNull().default(sql`nextval('doc_number_seq')`),
-    orderId: uuid("order_id")
-      .notNull()
-      .references(() => orders.id, { onDelete: "cascade" }),
-    orderItemId: uuid("order_item_id")
-      .notNull()
-      .references(() => orderItems.id, { onDelete: "cascade" }),
-    templateId: uuid("template_id")
-      .notNull()
-      .references(() => workflowTemplates.id),
-    methodCode: varchar("method_code", { length: 24 }).notNull(),
-    status: jobStatus("status").notNull().default("PLANNED"),
-    quantity: integer("quantity").notNull(),
-    /** Lower number = more urgent. Derived from order priority + due date, overridable. */
-    priority: integer("priority").notNull().default(50),
-    dueDate: timestamp("due_date", { withTimezone: true }),
-    releasedAt: timestamp("released_at", { withTimezone: true }),
-    startedAt: timestamp("started_at", { withTimezone: true }),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    ...timestamps,
-  },
-  (t) => [
-    uniqueIndex("production_jobs_number_uq").on(t.number),
-    uniqueIndex("production_jobs_item_uq").on(t.orderItemId),
-    index("production_jobs_status_idx").on(t.status),
-  ],
-);
-
-export const productionTasks = pgTable(
-  "production_tasks",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    jobId: uuid("job_id")
-      .notNull()
-      .references(() => productionJobs.id, { onDelete: "cascade" }),
-    orderId: uuid("order_id")
-      .notNull()
-      .references(() => orders.id, { onDelete: "cascade" }),
-    stepKey: varchar("step_key", { length: 40 }).notNull(),
-    stepTypeCode: varchar("step_type_code", { length: 32 })
-      .notNull()
-      .references(() => stepTypes.code),
+    code: varchar("code", { length: 24 }).notNull(),
     name: text("name").notNull(),
-    attempt: integer("attempt").notNull().default(1),
-    /** Step keys (after condition pruning) that must be complete first. */
-    dependsOn: text("depends_on").array().notNull().default(sql`'{}'::text[]`),
-    status: taskStatus("status").notNull().default("PENDING"),
-    gate: jsonb("gate").$type<Gate | null>(),
-    isQc: boolean("is_qc").notNull().default(false),
-    reworkTargets: text("rework_targets").array().notNull().default(sql`'{}'::text[]`),
-    milestone: varchar("milestone", { length: 16 }).notNull(),
-    checklist: jsonb("checklist").$type<string[]>().notNull().default([]),
-    machineTypeCode: varchar("machine_type_code", { length: 32 }).references(() => machineTypes.code),
-    machineId: uuid("machine_id").references(() => machines.id, { onDelete: "set null" }),
-    assigneeId: uuid("assignee_id").references(() => employees.id, { onDelete: "set null" }),
-    priority: integer("priority").notNull().default(50),
-    estimatedMinutes: integer("estimated_minutes").notNull().default(0),
-    actualMinutes: integer("actual_minutes").notNull().default(0),
-    minLagMinutes: integer("min_lag_minutes").notNull().default(0),
-    quantityPlanned: integer("quantity_planned").notNull(),
-    quantityCompleted: integer("quantity_completed").notNull().default(0),
-    readyAt: timestamp("ready_at", { withTimezone: true }),
-    /** Earliest start honouring min lag (drying/curing). */
-    earliestStartAt: timestamp("earliest_start_at", { withTimezone: true }),
-    startedAt: timestamp("started_at", { withTimezone: true }),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    blockedReason: text("blocked_reason"),
-    reworkOfTaskId: uuid("rework_of_task_id"),
-    reworkReason: text("rework_reason"),
+    category: machineCategory("category").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
-    sortOrder: integer("sort_order").notNull().default(0),
-    version: integer("version").notNull().default(1),
     ...timestamps,
   },
-  (t) => [
-    uniqueIndex("production_tasks_attempt_uq").on(t.jobId, t.stepKey, t.attempt),
-    index("production_tasks_status_idx").on(t.status, t.stepTypeCode),
-    index("production_tasks_machine_idx").on(t.machineId, t.status),
-    index("production_tasks_assignee_idx").on(t.assigneeId, t.status),
-    index("production_tasks_order_idx").on(t.orderId),
-    check("production_tasks_qty_nonneg", sql`${t.quantityPlanned} >= 0 AND ${t.quantityCompleted} >= 0`),
-    // An operator can only be running one thing per task row; timing is in task_time_logs.
-    check(
-      "production_tasks_started_when_running",
-      sql`${t.status} NOT IN ('IN_PROGRESS','PAUSED') OR ${t.startedAt} IS NOT NULL`,
-    ),
-  ],
+  (t) => [uniqueIndex("machines_code_uq").on(t.code)],
 );
 
-export const taskTimeLogs = pgTable(
-  "task_time_logs",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    taskId: uuid("task_id")
-      .notNull()
-      .references(() => productionTasks.id, { onDelete: "cascade" }),
-    employeeId: uuid("employee_id").references(() => employees.id),
-    machineId: uuid("machine_id").references(() => machines.id),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-    endedAt: timestamp("ended_at", { withTimezone: true }),
-    endReason: varchar("end_reason", { length: 16 }),
-  },
-  (t) => [
-    index("task_time_logs_task_idx").on(t.taskId),
-    // At most one open time log per task.
-    uniqueIndex("task_time_logs_one_open").on(t.taskId).where(sql`${t.endedAt} IS NULL`),
-  ],
-);
+// ── Production plan ─────────────────────────────────────────────────────────
 
-export const taskEvents = pgTable(
-  "task_events",
+/**
+ * The production plan of one order: only the stations the approver selected.
+ * `phase` orders the plan; a step becomes READY when every step in earlier
+ * phases is DONE (steps sharing a phase run in parallel, e.g. Offset
+ * lithography and paper procurement). Station definitions: modules/workflow/stations.ts.
+ */
+export const productionSteps = pgTable(
+  "production_steps",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    taskId: uuid("task_id")
-      .notNull()
-      .references(() => productionTasks.id, { onDelete: "cascade" }),
-    type: varchar("type", { length: 32 }).notNull(),
-    actorId: uuid("actor_id").references(() => users.id),
-    note: text("note"),
-    data: jsonb("data").$type<Record<string, unknown>>(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("task_events_task_idx").on(t.taskId, t.createdAt)],
-);
-
-export const productionIssues = pgTable(
-  "production_issues",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    taskId: uuid("task_id")
-      .notNull()
-      .references(() => productionTasks.id, { onDelete: "cascade" }),
     orderId: uuid("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    type: issueType("type").notNull(),
-    status: issueStatus("status").notNull().default("OPEN"),
-    description: text("description").notNull(),
-    resolution: text("resolution"),
-    reportedBy: uuid("reported_by").references(() => users.id),
-    resolvedBy: uuid("resolved_by").references(() => users.id),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    key: varchar("key", { length: 32 }).notNull(),
+    phase: integer("phase").notNull(),
+    status: stepStatus("status").notNull().default("WAITING"),
+    assigneeId: uuid("assignee_id").references(() => employees.id, { onDelete: "set null" }),
+    machineId: uuid("machine_id").references(() => machines.id, { onDelete: "set null" }),
+    readyAt: timestamp("ready_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    startedBy: uuid("started_by").references(() => users.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    completedBy: uuid("completed_by").references(() => users.id),
+    /** Times this step was sent back by a quality rejection. */
+    reworkCount: integer("rework_count").notNull().default(0),
+    note: text("note"),
+    /** Step-specific record, e.g. paper used: { materialId, quantity }. */
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    ...timestamps,
   },
-  (t) => [index("production_issues_status_idx").on(t.status), index("production_issues_task_idx").on(t.taskId)],
+  (t) => [uniqueIndex("production_steps_order_key_uq").on(t.orderId, t.key), index("production_steps_queue_idx").on(t.key, t.status)],
 );
 
-// ── Quality control ─────────────────────────────────────────────────────────
+/** Print-quality and final-quality decisions (history; a rejection sends work back). */
+export const qualityApprovals = pgTable(
+  "quality_approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => productionSteps.id, { onDelete: "cascade" }),
+    decision: qualityDecision("decision").notNull(),
+    approverId: uuid("approver_id")
+      .notNull()
+      .references(() => users.id),
+    notes: text("notes"),
+    reason: text("reason"),
+    /** On rejection: the step the work returns to. */
+    returnToStep: varchar("return_to_step", { length: 32 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("quality_approvals_order_idx").on(t.orderId, t.createdAt)],
+);
 
-export const qcDefectTypes = pgTable("qc_defect_types", {
-  code: varchar("code", { length: 32 }).primaryKey(),
+/** Audited priority changes (who, when, why, optional extra charge). */
+export const priorityChanges = pgTable(
+  "priority_changes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    isPriority: boolean("is_priority").notNull(),
+    reason: text("reason").notNull(),
+    charge: money("charge"),
+    changedBy: uuid("changed_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("priority_changes_order_idx").on(t.orderId, t.createdAt)],
+);
+
+// ── Materials (paper, cardboard, film, UV, binding, plates, packaging) ──────
+
+export const materials = pgTable(
+  "materials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sku: varchar("sku", { length: 48 }).notNull(),
+    name: text("name").notNull(),
+    /** PAPER | CARDBOARD | FILM | UV | BINDING | PLATE | PACKAGING | OTHER */
+    category: varchar("category", { length: 16 }).notNull(),
+    unit: varchar("unit", { length: 12 }).notNull(),
+    /** Standard cost per unit (rial); the store pricing engine uses it. */
+    standardCost: numeric("standard_cost", { precision: 16, scale: 2, mode: "number" }).notNull().default(0),
+    grammage: integer("grammage"),
+    sheetWidthMm: integer("sheet_width_mm"),
+    sheetHeightMm: integer("sheet_height_mm"),
+    stock: qty("stock").notNull().default(0),
+    minStock: qty("min_stock").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("materials_sku_uq").on(t.sku), check("materials_cost_nonneg", sql`${t.standardCost} >= 0`)],
+);
+
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    materialId: uuid("material_id")
+      .notNull()
+      .references(() => materials.id),
+    delta: qty("delta").notNull(),
+    reason: stockMovementReason("reason").notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stock_movements_material_idx").on(t.materialId, t.createdAt)],
+);
+
+// ── Offset: suppliers, paper quotations, lithography ───────────────────────
+
+export const suppliers = pgTable("suppliers", {
+  id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  /** PAPER | LITHO | OTHER */
+  kind: varchar("kind", { length: 12 }).notNull(),
+  contactName: text("contact_name"),
+  phone: varchar("phone", { length: 16 }),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  ...timestamps,
 });
 
-export const qcInspections = pgTable(
-  "qc_inspections",
+/** Prices collected by phone from paper suppliers for one order. */
+export const supplierQuotes = pgTable(
+  "supplier_quotes",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    taskId: uuid("task_id")
+    orderId: uuid("order_id")
       .notNull()
-      .references(() => productionTasks.id, { onDelete: "cascade" }),
-    jobId: uuid("job_id")
+      .references(() => orders.id, { onDelete: "cascade" }),
+    supplierId: uuid("supplier_id")
       .notNull()
-      .references(() => productionJobs.id, { onDelete: "cascade" }),
-    orderItemId: uuid("order_item_id")
-      .notNull()
-      .references(() => orderItems.id, { onDelete: "cascade" }),
-    inspectorId: uuid("inspector_id").references(() => employees.id),
-    result: qcResult("result").notNull(),
-    quantityChecked: integer("quantity_checked").notNull(),
-    quantityRejected: integer("quantity_rejected").notNull().default(0),
-    checklist: jsonb("checklist").$type<{ item: string; passed: boolean }[]>().notNull().default([]),
-    reworkTargetStepKey: varchar("rework_target_step_key", { length: 40 }),
-    reworkQuantity: integer("rework_quantity"),
+      .references(() => suppliers.id),
+    price: money("price").notNull(),
+    quotedAt: timestamp("quoted_at", { withTimezone: true }).notNull().defaultNow(),
     notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("qc_inspections_item_idx").on(t.orderItemId),
-    check("qc_rejected_le_checked", sql`${t.quantityRejected} >= 0 AND ${t.quantityRejected} <= ${t.quantityChecked}`),
-  ],
+  (t) => [index("supplier_quotes_order_idx").on(t.orderId), check("supplier_quotes_price_pos", sql`${t.price} > 0`)],
 );
 
-export const qcDefects = pgTable(
-  "qc_defects",
+/** The manager's choice among the quotes (one per order; re-deciding replaces it and is audited). */
+export const procurementDecisions = pgTable(
+  "procurement_decisions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    inspectionId: uuid("inspection_id")
+    orderId: uuid("order_id")
       .notNull()
-      .references(() => qcInspections.id, { onDelete: "cascade" }),
-    defectCode: varchar("defect_code", { length: 32 })
+      .references(() => orders.id, { onDelete: "cascade" }),
+    quoteId: uuid("quote_id")
       .notNull()
-      .references(() => qcDefectTypes.code),
-    severity: defectSeverity("severity").notNull(),
-    quantity: integer("quantity").notNull().default(0),
-    description: text("description"),
+      .references(() => supplierQuotes.id),
+    approvedBy: uuid("approved_by")
+      .notNull()
+      .references(() => users.id),
+    notes: text("notes"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("qc_defects_inspection_idx").on(t.inspectionId)],
+  (t) => [uniqueIndex("procurement_decisions_order_uq").on(t.orderId)],
+);
+
+/** Outsourced lithography (plates/films): recorded, not controlled. */
+export const lithographyJobs = pgTable(
+  "lithography_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    supplierId: uuid("supplier_id").references(() => suppliers.id),
+    status: lithoStatus("status").notNull().default("NOT_ORDERED"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    expectedAt: timestamp("expected_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    price: money("price"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("lithography_jobs_order_uq").on(t.orderId)],
 );

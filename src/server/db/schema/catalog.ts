@@ -13,35 +13,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import type { NumberConfig, OptionEffects, PricingRules, ProductSpec } from "@/server/modules/pricing/types";
-import type { Gate, StepCondition } from "@/server/modules/workflow/types";
-import { optionType, ruleVersionStatus, templateStatus } from "./enums";
+import { optionType, productionType, ruleVersionStatus } from "./enums";
 import { timestamps, users } from "./identity";
-
-// ── Production methods & step types (extensible reference data) ─────────────
-
-export const productionMethods = pgTable("production_methods", {
-  code: varchar("code", { length: 24 }).primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  isActive: boolean("is_active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
-
-export const machineTypes = pgTable("machine_types", {
-  code: varchar("code", { length: 32 }).primaryKey(),
-  name: text("name").notNull(),
-  capacityUnit: varchar("capacity_unit", { length: 24 }).notNull().default("SHEET"),
-});
-
-export const stepTypes = pgTable("step_types", {
-  code: varchar("code", { length: 32 }).primaryKey(),
-  name: text("name").notNull(),
-  /** DESIGN | PREPRESS | GATE | PRINTING | FINISHING | QC | PACKAGING */
-  category: varchar("category", { length: 16 }).notNull(),
-  machineTypeCode: varchar("machine_type_code", { length: 32 }).references(() => machineTypes.code),
-  color: varchar("color", { length: 16 }),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
 
 // ── Pricing rule sets (versioned) ───────────────────────────────────────────
 
@@ -80,58 +53,6 @@ export const pricingRuleVersions = pgTable(
       .on(t.ruleSetId)
       .where(sql`${t.status} = 'PUBLISHED'`),
   ],
-);
-
-// ── Workflow templates (versioned) ──────────────────────────────────────────
-
-export const workflowTemplates = pgTable(
-  "workflow_templates",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    code: varchar("code", { length: 48 }).notNull(),
-    version: integer("version").notNull(),
-    name: text("name").notNull(),
-    methodCode: varchar("method_code", { length: 24 })
-      .notNull()
-      .references(() => productionMethods.code),
-    status: templateStatus("status").notNull().default("DRAFT"),
-    description: text("description"),
-    createdBy: uuid("created_by").references(() => users.id),
-    ...timestamps,
-  },
-  (t) => [
-    uniqueIndex("workflow_templates_code_version_uq").on(t.code, t.version),
-    uniqueIndex("workflow_templates_one_active")
-      .on(t.code)
-      .where(sql`${t.status} = 'ACTIVE'`),
-  ],
-);
-
-export const workflowTemplateSteps = pgTable(
-  "workflow_template_steps",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    templateId: uuid("template_id")
-      .notNull()
-      .references(() => workflowTemplates.id, { onDelete: "cascade" }),
-    key: varchar("key", { length: 40 }).notNull(),
-    name: text("name").notNull(),
-    stepTypeCode: varchar("step_type_code", { length: 32 })
-      .notNull()
-      .references(() => stepTypes.code),
-    dependsOn: text("depends_on").array().notNull().default(sql`'{}'::text[]`),
-    condition: jsonb("condition").$type<StepCondition>().notNull().default({ type: "ALWAYS" }),
-    gate: jsonb("gate").$type<Gate | null>(),
-    machineTypeCode: varchar("machine_type_code", { length: 32 }).references(() => machineTypes.code),
-    defaultMinutes: integer("default_minutes").notNull().default(0),
-    minLagMinutes: integer("min_lag_minutes").notNull().default(0),
-    isQc: boolean("is_qc").notNull().default(false),
-    reworkTargets: text("rework_targets").array().notNull().default(sql`'{}'::text[]`),
-    milestone: varchar("milestone", { length: 16 }).notNull(),
-    checklist: jsonb("checklist").$type<string[]>().notNull().default([]),
-    sortOrder: integer("sort_order").notNull().default(0),
-  },
-  (t) => [uniqueIndex("workflow_template_steps_key_uq").on(t.templateId, t.key)],
 );
 
 // ── Catalog ─────────────────────────────────────────────────────────────────
@@ -180,7 +101,7 @@ export const products = pgTable(
   (t) => [
     uniqueIndex("products_slug_uq").on(t.slug),
     index("products_category_idx").on(t.categoryId),
-    index("products_name_trgm").using("gin", sql`${t.name} gin_trgm_ops`),
+    index("products_name_idx").on(t.name),
     check("products_qty_range", sql`${t.minQuantity} >= 1 AND (${t.maxQuantity} IS NULL OR ${t.maxQuantity} >= ${t.minQuantity})`),
   ],
 );
@@ -201,7 +122,11 @@ export const productImages = pgTable(
   (t) => [index("product_images_product_idx").on(t.productId)],
 );
 
-/** Which production methods can make a product, and for which quantity range. */
+/**
+ * Which process (Digital / Offset) can make a store product, and for which
+ * quantity range. The pricing engine picks the cheapest eligible one; that
+ * decides the order's production type.
+ */
 export const productMethods = pgTable(
   "product_methods",
   {
@@ -209,10 +134,7 @@ export const productMethods = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
-    methodCode: varchar("method_code", { length: 24 })
-      .notNull()
-      .references(() => productionMethods.code),
-    workflowTemplateCode: varchar("workflow_template_code", { length: 48 }).notNull(),
+    methodCode: productionType("method_code").notNull(),
     minQuantity: integer("min_quantity").notNull().default(1),
     maxQuantity: integer("max_quantity"),
     sortOrder: integer("sort_order").notNull().default(0),

@@ -45,7 +45,8 @@ export const notificationTemplates = pgTable(
     eventType: varchar("event_type", { length: 64 }).notNull(),
     channel: notificationChannel("channel").notNull(),
     audience: notificationAudience("audience").notNull(),
-    roleCode: varchar("role_code", { length: 48 }),
+    /** STAFF audience: everyone holding this permission (e.g. order.approve.digital). */
+    permission: varchar("permission", { length: 48 }),
     title: text("title").notNull(),
     /** Mustache-style {{var}} placeholders; values are escaped plain text. */
     body: text("body").notNull(),

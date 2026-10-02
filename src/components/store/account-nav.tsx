@@ -8,7 +8,6 @@ import { cn } from "@/lib/cn";
 
 const TABS = [
   { href: "/account", label: "سفارش‌ها", exact: true },
-  { href: "/account/quotes", label: "پیش‌فاکتورها" },
   { href: "/account/profile", label: "مشخصات و آدرس‌ها" },
 ];
 

@@ -42,7 +42,7 @@ export default async function HomePage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
-                <Link href="/quote">استعلام قیمت سفارشی</Link>
+                <Link href="/order">ثبت سفارش اختصاصی</Link>
               </Button>
             </div>
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
@@ -150,16 +150,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Custom quote CTA */}
+      {/* Custom order CTA */}
       <section className="mx-auto mt-24 max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col items-start justify-between gap-6 rounded-[28px] border border-line bg-gradient-to-l from-accent-soft to-surface p-8 sm:flex-row sm:items-center sm:p-10">
           <div>
             <h2 className="text-[22px] font-bold">سفارش خاصی دارید؟</h2>
-            <p className="mt-2 max-w-lg text-[14px] leading-7 text-muted">جعبه، بسته‌بندی، کتاب یا هر کار چاپی دیگر؛ مشخصات را بفرستید تا پیش‌فاکتور رسمی برایتان صادر شود.</p>
+            <p className="mt-2 max-w-lg text-[14px] leading-7 text-muted">جعبه، بسته‌بندی، کتاب یا هر کار چاپی دیگر؛ دیجیتال یا افست، مشخصات را بفرستید تا بررسی و قیمت‌گذاری شود.</p>
           </div>
           <Button asChild size="lg" variant="primary">
-            <Link href="/quote">
-              درخواست پیش‌فاکتور <ArrowLeft />
+            <Link href="/order">
+              ثبت سفارش اختصاصی <ArrowLeft />
             </Link>
           </Button>
         </div>

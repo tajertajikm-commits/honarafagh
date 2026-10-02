@@ -3,27 +3,24 @@
  * Payloads carry identifiers only; handlers load current state.
  */
 export interface DomainEvents {
-  OrderPlaced: { orderId: string };
-  OrderConfirmed: { orderId: string };
+  OrderSubmitted: { orderId: string };
+  OrderApproved: { orderId: string };
+  OrderNeedsInfo: { orderId: string; note: string };
+  OrderRejected: { orderId: string; note: string };
+  CustomerReplied: { orderId: string };
+  OrderPriced: { orderId: string };
   OrderCancelled: { orderId: string; reason: string };
+  ArtworkUploaded: { orderId: string };
+  ArtworkNeedsCorrection: { orderId: string; note: string };
+  DesignAssigned: { orderId: string; designerUserId: string | null };
+  QualityCheckNeeded: { orderId: string; stepKey: string };
+  PaperDecisionNeeded: { orderId: string };
   OrderReady: { orderId: string };
-  OrderCompleted: { orderId: string };
+  OrderShipped: { orderId: string };
+  OrderDelivered: { orderId: string };
   PaymentReceived: { orderId: string; paymentId: string; amount: number };
   PaymentRefunded: { orderId: string; paymentId: string; amount: number };
   PaymentAwaitingApproval: { orderId: string; paymentId: string };
-  ProofSent: { orderId: string; orderItemId: string; versionId: string };
-  ArtworkApproved: { orderId: string; orderItemId: string; versionId: string };
-  ProductionStarted: { orderId: string };
-  ProductionCompleted: { orderId: string };
-  QcFailed: { orderId: string; taskId: string; inspectionId: string };
-  IssueReported: { orderId: string; taskId: string; issueId: string };
-  MaterialShortage: { materialId: string; requestId: string; orderId: string | null };
-  StockLow: { materialId: string };
-  DeliveryAssigned: { orderId: string; shipmentId: string };
-  DeliveryDispatched: { orderId: string; shipmentId: string };
-  DeliveryCompleted: { orderId: string; shipmentId: string };
-  DeliveryFailed: { orderId: string; shipmentId: string };
-  QuoteSent: { quoteId: string };
-  InquiryReceived: { inquiryId: string };
+  InvoiceIssued: { orderId: string; invoiceId: string };
 }
 export type DomainEventType = keyof DomainEvents;

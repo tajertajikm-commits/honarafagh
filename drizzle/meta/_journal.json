@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1790572949514,
-      "tag": "0000_extensions",
+      "when": 1790943861332,
+      "tag": "0000_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1790572955355,
-      "tag": "0001_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790572976690,
-      "tag": "0002_integrity",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1790574434852,
-      "tag": "0003_vat_pct",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1790574815179,
-      "tag": "0004_notification_outbox_ref",
+      "when": 1790943869259,
+      "tag": "0001_integrity",
       "breakpoints": true
     }
   ]

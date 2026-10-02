@@ -36,7 +36,7 @@ export const productDefinitionSchema = z.object({
   /** Site-relative path or https URL only (never javascript:, data: …). */
   imageUrl: z.string().max(500).regex(/^(\/[\w\-./]+|https:\/\/[^\s"'<>]+)$/, "آدرس تصویر باید مسیر داخلی یا https باشد.").nullable().optional(),
   methods: z
-    .array(z.object({ methodCode: z.string(), workflowTemplateCode: z.string(), minQuantity: z.number().int().min(1), maxQuantity: z.number().int().nullable() }))
+    .array(z.object({ methodCode: z.enum(["DIGITAL", "OFFSET"]), minQuantity: z.number().int().min(1), maxQuantity: z.number().int().nullable() }))
     .min(1),
   groups: z.array(
     z.object({
@@ -191,7 +191,7 @@ export async function productDefinitionFor(ctx: Ctx, productId: string): Promise
     isFeatured: p.isFeatured,
     highlights: p.highlights,
     imageUrl: image?.url ?? null,
-    methods: methods.map((m) => ({ methodCode: m.methodCode, workflowTemplateCode: m.workflowTemplateCode, minQuantity: m.minQuantity, maxQuantity: m.maxQuantity })),
+    methods: methods.map((m) => ({ methodCode: m.methodCode, minQuantity: m.minQuantity, maxQuantity: m.maxQuantity })),
     groups: groups.map((g) => ({
       key: g.key,
       label: g.label,

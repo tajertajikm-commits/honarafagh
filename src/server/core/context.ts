@@ -10,9 +10,7 @@ export type StaffActor = {
   name: string;
   permissions: ReadonlySet<Permission>;
   roleCodes: readonly string[];
-  workspaces: readonly string[];
-  /** Production step types this employee may perform. */
-  stepTypes: readonly string[];
+  roleNames: readonly string[];
 };
 export type CustomerActor = { kind: "customer"; userId: string; customerId: string; name: string };
 export type SystemActor = { kind: "system"; name: string };

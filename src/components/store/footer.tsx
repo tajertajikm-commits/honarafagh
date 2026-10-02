@@ -17,7 +17,7 @@ export function StoreFooter({ business }: { business: { name: string; phone: str
           <p className="text-[13px] font-bold text-ink">دسترسی سریع</p>
           <ul className="mt-3 space-y-2 text-[13.5px] text-muted">
             <li><Link className="hover:text-ink" href="/products">همه محصولات</Link></li>
-            <li><Link className="hover:text-ink" href="/quote">استعلام قیمت سفارشی</Link></li>
+            <li><Link className="hover:text-ink" href="/order">ثبت سفارش اختصاصی</Link></li>
             <li><Link className="hover:text-ink" href="/track">پیگیری سفارش</Link></li>
             <li><Link className="hover:text-ink" href="/account">حساب کاربری</Link></li>
           </ul>

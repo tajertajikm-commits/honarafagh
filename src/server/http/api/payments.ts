@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { appUrl } from "@/server/config/env";
 import { approvePayment, handlePaymentCallback, recordManualPayment, refundPayment, rejectPayment, startOnlinePayment } from "@/server/modules/finance/service";
+import { issueInvoice, voidInvoice } from "@/server/modules/finance/invoices";
 import { api } from "../router";
 import { dateLike, idempotencyKey, note, positiveRial, reason, uuid } from "./schemas";
 
@@ -50,4 +51,9 @@ export const paymentRoutes = [
     { auth: "staff", body: z.object({ amount: positiveRial, method: z.enum(["CASH", "POS", "BANK_TRANSFER", "CHEQUE"]), reference: z.string().max(120).optional().nullable(), reason, idempotencyKey }) },
     async ({ ctx, params, body }) => refundPayment(ctx, params.id!, body),
   ),
+  api.post("orders/:id/invoices", { auth: "staff", body: z.object({ type: z.enum(["OFFICIAL", "UNOFFICIAL"]).optional(), notes: z.string().max(1000).nullable().optional() }) }, async ({ ctx, params, body }) => {
+    const inv = await issueInvoice(ctx, params.id!, body);
+    return { id: inv.id, number: inv.number };
+  }),
+  api.post("invoices/:id/void", { auth: "staff", body: z.object({ reason }) }, async ({ ctx, params, body }) => voidInvoice(ctx, params.id!, body.reason)),
 ];

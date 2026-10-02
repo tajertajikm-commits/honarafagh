@@ -7,7 +7,7 @@ import { NotificationsBell } from "./notifications-bell";
 
 const NAV = [
   { href: "/products", label: "محصولات" },
-  { href: "/quote", label: "استعلام سفارشی" },
+  { href: "/order", label: "سفارش اختصاصی" },
   { href: "/track", label: "پیگیری سفارش" },
 ];
 

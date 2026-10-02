@@ -11,18 +11,28 @@ describe("reference seed", () => {
     await closeDb();
   });
 
-  it("creates opening stock through the ledger", async () => {
-    const db = getDb();
-    const res = await db.execute<{ n: number; ok: boolean }>(sql`
-      SELECT count(*)::int AS n,
-             bool_and(s.on_hand = (SELECT coalesce(sum(on_hand_delta),0) FROM inventory_transactions t WHERE t.material_id = s.material_id AND t.location_id = s.location_id)) AS ok
-      FROM stock_levels s`);
+  it("opening stock equals the ledger", async () => {
+    const res = await getDb().execute<{ n: number; ok: boolean }>(sql`
+      SELECT count(*)::int AS n, bool_and(m.stock = (SELECT coalesce(sum(delta), 0) FROM stock_movements s WHERE s.material_id = m.id)) AS ok FROM materials m`);
     expect(res.rows[0]!.n).toBeGreaterThan(10);
     expect(res.rows[0]!.ok).toBe(true);
   });
 
-  it("forbids editing the inventory ledger", async () => {
-    await expect(getDb().execute(sql`UPDATE inventory_transactions SET quantity = 1`)).rejects.toThrow();
+  it("the real staff and their roles exist", async () => {
+    const res = await getDb().execute<{ full_name: string; codes: string }>(sql`
+      SELECT u.full_name, string_agg(r.code, ',') AS codes FROM employees e JOIN users u ON u.id = e.user_id
+      JOIN employee_roles er ON er.employee_id = e.id JOIN roles r ON r.id = er.role_id GROUP BY u.full_name`);
+    const byName = Object.fromEntries(res.rows.map((r) => [r.full_name, r.codes]));
+    expect(byName["حامد نورصالحی"]).toBe("MANAGER");
+    expect(byName["آقای لبافی"]).toBe("DIGITAL_MANAGER");
+    expect(byName["حسین عبدالی"]).toBe("ACCOUNTANT");
+    expect(byName["آقای قلی‌پور"]).toBe("OFFSET_MANAGER");
+    expect(byName["مجتبی حاج‌قاسمی"]).toBe("OFFSET_PRODUCTION");
+    expect(byName["آقای معماریان"]).toBe("DESIGNER");
+  });
+
+  it("forbids editing the audit log and stock ledger", async () => {
+    await expect(getDb().execute(sql`UPDATE stock_movements SET delta = 1`)).rejects.toThrow();
     await expect(getDb().execute(sql`DELETE FROM audit_logs`)).resolves.toBeDefined(); // empty table: no rows affected
   });
 });

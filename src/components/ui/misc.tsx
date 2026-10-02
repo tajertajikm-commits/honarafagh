@@ -22,6 +22,23 @@ export function Code({ children, className }: { children: ReactNode; className?:
   return <bdi className={cn("ltr tabular font-medium", className)} dir="ltr">{children}</bdi>;
 }
 
+/** Order codes (D-1042-0037) stay Latin and LTR everywhere, exactly as typed in search. */
+export function OrderCode({ code, className }: { code: string; className?: string }) {
+  return (
+    <bdi dir="ltr" className={cn("font-bold tabular tracking-normal", className)}>
+      {code}
+    </bdi>
+  );
+}
+
+export function CustomerCode({ code, className }: { code: number; className?: string }) {
+  return (
+    <bdi dir="ltr" className={cn("tabular font-medium", className)}>
+      CUS-{code}
+    </bdi>
+  );
+}
+
 export function OrderNo({ n, className }: { n: number; className?: string }) {
   return <span className={cn("tabular font-bold", className)}>#{toFaDigits(n)}</span>;
 }

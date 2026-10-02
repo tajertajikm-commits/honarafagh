@@ -1,153 +1,187 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BadgeCheck, CircleDollarSign, Clock, RotateCcw, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Code, DateText, EmptyState, Money, OrderNo } from "@/components/ui/misc";
+import { CustomerCode, DateText, EmptyState, Money, OrderCode } from "@/components/ui/misc";
 import { Status } from "@/components/ui/status";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { BarList } from "@/components/panel/charts";
-import { MoneyDialogButton, PaymentDecision } from "@/components/panel/finance-actions";
+import { ActionButton, ReasonAction } from "@/components/panel/actions";
 import { FilterTabs, PageHeader, Stat } from "@/components/panel/page";
-import { ORDER_STATUS, PAYMENT_METHOD, PAYMENT_RECORD_STATUS } from "@/lib/labels";
-import { formatNumber, formatPhone, formatToman } from "@/lib/persian";
+import { SearchBox } from "@/components/panel/search-box";
+import { TypeChip } from "@/components/panel/chips";
+import { can } from "@/server/core/context";
 import { requireStaffPage } from "@/server/http/session";
-import { financeSummary, paymentLedger, receivables, refundsDue } from "@/server/modules/finance/queries";
+import { accountingOrders, accountingSummary, invoiceList, paymentLedger, type AccountingFilter } from "@/server/modules/finance/queries";
+import { CUSTOMER_TYPE, INVOICE_TYPE, ORDER_STATUS, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS } from "@/lib/labels";
+import { formatNumber } from "@/lib/persian";
 
-export const metadata: Metadata = { title: "مالی" };
+export const metadata: Metadata = { title: "حسابداری و فاکتور" };
 
-const TABS = [
-  { key: "approvals", label: "در انتظار تأیید" },
-  { key: "receivables", label: "مطالبات" },
-  { key: "refunds", label: "بازپرداخت‌ها" },
-  { key: "cheques", label: "چک‌ها" },
-  { key: "ledger", label: "دفتر دریافت و پرداخت" },
-] as const;
-
-const daysSince = (d: Date | null, now = new Date()) => (d ? Math.floor((now.getTime() - d.getTime()) / 86_400_000) : 0);
-
-export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ tab?: string; filter?: string; q?: string }> }) {
+  const ctx = await requireStaffPage({ anyOf: ["payment.view", "invoice.manage"] });
   const sp = await searchParams;
-  const ctx = await requireStaffPage({ workspace: "accounting", permission: "payment.view" });
-  const perms = ctx.actor.permissions;
-  const summary = await financeSummary(ctx);
-  const recv = await receivables(ctx);
-  const refunds = await refundsDue(ctx);
-  const approvals = await paymentLedger(ctx, { status: ["AWAITING_APPROVAL"], limit: 200 });
-  const tab = TABS.find((t) => t.key === sp.tab)?.key ?? (approvals.length ? "approvals" : "receivables");
-  const cheques = tab === "cheques" ? await paymentLedger(ctx, { method: "CHEQUE", limit: 200 }) : [];
-  const ledger = tab === "ledger" ? await paymentLedger(ctx, { limit: 150 }) : [];
-  const readyBlocked = recv.filter((r) => r.status === "READY");
-  const counts: Record<string, number> = { approvals: approvals.length, receivables: recv.length, refunds: refunds.length };
-
-  const paymentRows = (rows: typeof approvals, withDecision: boolean) => (
-    <Table>
-      <THead><tr><TH>شماره</TH><TH>سفارش</TH><TH>مشتری</TH><TH>روش</TH><TH className="text-end">مبلغ</TH><TH>مرجع</TH><TH>زمان</TH><TH>وضعیت</TH><TH /></tr></THead>
-      <TBody>
-        {rows.map(({ payment: p, orderNumber, customerName, createdBy }) => (
-          <TR key={p.id}>
-            <TD className="tabular text-muted">{formatNumber(p.number).replace(/٬/g, "")}</TD>
-            <TD><Link href={`/panel/orders/${p.orderId}`} className="hover:text-accent-ink"><OrderNo n={orderNumber} /></Link></TD>
-            <TD>{customerName}</TD>
-            <TD>{p.kind === "REFUND" ? <Badge tone="warning">بازپرداخت • {PAYMENT_METHOD[p.method]}</Badge> : PAYMENT_METHOD[p.method]}</TD>
-            <TD className="text-end"><Money rial={p.amount} strong /></TD>
-            <TD className="text-[12.5px]">
-              {p.reference || p.providerRefId ? <Code>{p.reference ?? p.providerRefId}</Code> : "—"}
-              {p.chequeDueDate && <span className="block text-muted">سررسید <DateText value={p.chequeDueDate} /></span>}
-              {p.receiptFileId && <a className="block font-bold text-accent-ink" href={`/api/v1/files/${p.receiptFileId}?inline=1`} target="_blank" rel="noreferrer">مشاهده رسید</a>}
-            </TD>
-            <TD className="text-[12.5px] text-muted"><DateText value={p.createdAt} withTime />{createdBy && <span className="block">{createdBy}</span>}</TD>
-            <TD><Status map={PAYMENT_RECORD_STATUS} value={p.status} />{p.rejectionReason && <span className="block max-w-[160px] truncate text-[11.5px] text-danger" title={p.rejectionReason}>{p.rejectionReason}</span>}</TD>
-            <TD className="text-end">{withDecision && p.status === "AWAITING_APPROVAL" && perms.has("payment.approve") && <PaymentDecision paymentId={p.id} />}</TD>
-          </TR>
-        ))}
-      </TBody>
-    </Table>
+  const tab = sp.tab === "payments" || sp.tab === "invoices" ? sp.tab : "orders";
+  const filter = (["open", "unpaid", "unpriced", "all"].includes(sp.filter ?? "") ? sp.filter : "open") as AccountingFilter;
+  const summary = await accountingSummary(ctx);
+  return (
+    <div className="mx-auto max-w-7xl">
+      <PageHeader title="حسابداری و فاکتور" description="سفارش‌ها و مانده حساب، پرداخت‌ها و فاکتورهای رسمی و غیررسمی." />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="مطالبات" value={<Money rial={summary.receivable} />} tone="warning" />
+        <Stat label="سفارش با مانده" value={formatNumber(summary.unpaidOrders)} href="/panel/accounting?filter=unpaid" />
+        <Stat label="بدون قیمت" value={formatNumber(summary.unpriced)} href="/panel/accounting?filter=unpriced" tone={summary.unpriced ? "warning" : "neutral"} />
+        <Stat label="پرداخت منتظر تأیید" value={formatNumber(summary.paymentsToConfirm)} href="/panel/accounting?tab=payments" tone={summary.paymentsToConfirm ? "warning" : "neutral"} />
+      </div>
+      <FilterTabs
+        active={tab}
+        tabs={[
+          { key: "orders", label: "سفارش‌ها و مانده", href: "/panel/accounting" },
+          { key: "payments", label: "پرداخت‌ها", href: "/panel/accounting?tab=payments", count: summary.paymentsToConfirm || undefined },
+          { key: "invoices", label: "فاکتورها", href: "/panel/accounting?tab=invoices" },
+        ]}
+      />
+      {tab === "orders" && <Orders ctx={ctx} filter={filter} q={sp.q} />}
+      {tab === "payments" && <Payments ctx={ctx} />}
+      {tab === "invoices" && <Invoices ctx={ctx} />}
+    </div>
   );
+}
 
+async function Orders({ ctx, filter, q }: { ctx: Parameters<typeof accountingOrders>[0]; filter: AccountingFilter; q?: string }) {
+  const rows = await accountingOrders(ctx, { filter, q });
+  const link = (f: string) => `/panel/accounting?filter=${f}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   return (
     <>
-      <PageHeader title="مالی" description="تأیید پرداخت‌ها، پیگیری مطالبات و تسویه، بازپرداخت و دفتر دریافت‌ها" />
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="دریافت امروز" value={<Money rial={summary.today} />} sub={<>۳۰ روز اخیر: <Money rial={summary.last30} /></>} icon={<CircleDollarSign />} />
-        <Stat label="در انتظار تأیید" value={formatNumber(summary.pendingCount)} sub={<Money rial={summary.pendingAmount} />} tone={summary.pendingCount ? "accent" : "neutral"} icon={<Clock />} href="/panel/accounting?tab=approvals" />
-        <Stat label="مانده مطالبات" value={<Money rial={summary.outstanding} />} sub={`${formatNumber(summary.outstandingCount)} سفارش • ${formatNumber(readyBlocked.length)} آماده تحویل`} tone={readyBlocked.length ? "warning" : "neutral"} icon={<Wallet />} href="/panel/accounting?tab=receivables" />
-        <Stat label="بازپرداخت معوق" value={formatNumber(refunds.length)} sub={<>بازپرداخت ۳۰ روز: <Money rial={summary.refunds30} /></>} tone={refunds.length ? "danger" : "neutral"} icon={<RotateCcw />} href="/panel/accounting?tab=refunds" />
-      </div>
-
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0">
-          <FilterTabs active={tab} tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: `/panel/accounting?tab=${t.key}`, count: counts[t.key] }))} />
-          <Card className="overflow-hidden">
-            {tab === "approvals" && (approvals.length === 0 ? <EmptyState icon={<BadgeCheck />} title="پرداختی در انتظار تأیید نیست" /> : paymentRows(approvals, true))}
-
-            {tab === "receivables" && (
-              recv.length === 0 ? <EmptyState icon={<BadgeCheck />} title="همه سفارش‌ها تسویه شده‌اند" /> : (
-                <Table>
-                  <THead><tr><TH>سفارش</TH><TH>مشتری</TH><TH>وضعیت</TH><TH className="text-end">مبلغ کل</TH><TH className="text-end">پرداخت‌شده</TH><TH className="text-end">مانده</TH><TH>سن</TH><TH /></tr></THead>
-                  <TBody>
-                    {recv.map((r) => (
-                      <TR key={r.id}>
-                        <TD><Link href={`/panel/orders/${r.id}`} className="hover:text-accent-ink"><OrderNo n={r.number} /></Link></TD>
-                        <TD><span className="font-bold">{r.customerName}</span><span className="block text-[11.5px] text-muted">{r.companyName ?? <Code>{formatPhone(r.customerPhone)}</Code>}</span></TD>
-                        <TD><Status map={ORDER_STATUS} value={r.status} />{r.status === "READY" && <span className="block text-[11.5px] text-warning">تحویل منوط به تسویه</span>}</TD>
-                        <TD className="text-end text-muted"><Money rial={r.total} unit={false} /></TD>
-                        <TD className="text-end"><Money rial={r.paid} unit={false} />{r.pendingApproval > 0 && <span className="block text-[11.5px] text-info">+{formatToman(r.pendingApproval, { unit: false })} در انتظار</span>}</TD>
-                        <TD className="text-end"><Money rial={r.balance} strong /></TD>
-                        <TD className={daysSince(r.placedAt) > 30 ? "font-bold text-danger" : "text-muted"}>{formatNumber(daysSince(r.placedAt))} روز</TD>
-                        <TD className="text-end">{perms.has("payment.create") && <MoneyDialogButton size="xs" orderId={r.id} mode="pay" defaultAmount={r.balance} label="تسویه" />}</TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              )
-            )}
-
-            {tab === "refunds" && (
-              refunds.length === 0 ? <EmptyState icon={<BadgeCheck />} title="بازپرداخت معوقی وجود ندارد" description="سفارش‌های لغوشده یا کاهش‌یافته که بیش از مبلغشان پرداخت شده، اینجا نمایش داده می‌شوند." /> : (
-                <Table>
-                  <THead><tr><TH>سفارش</TH><TH>مشتری</TH><TH>وضعیت</TH><TH className="text-end">مبلغ سفارش</TH><TH className="text-end">پرداخت‌شده</TH><TH className="text-end">قابل بازپرداخت</TH><TH /></tr></THead>
-                  <TBody>
-                    {refunds.map((r) => (
-                      <TR key={r.id}>
-                        <TD><Link href={`/panel/orders/${r.id}`} className="hover:text-accent-ink"><OrderNo n={r.number} /></Link></TD>
-                        <TD>{r.customerName}</TD>
-                        <TD><Status map={ORDER_STATUS} value={r.status} /></TD>
-                        <TD className="text-end text-muted"><Money rial={r.status === "CANCELLED" ? 0 : r.total} unit={false} /></TD>
-                        <TD className="text-end"><Money rial={r.paid} unit={false} /></TD>
-                        <TD className="text-end text-danger"><Money rial={r.excess} strong /></TD>
-                        <TD className="text-end">{perms.has("payment.refund") && <MoneyDialogButton size="xs" orderId={r.id} mode="refund" defaultAmount={r.excess} maxAmount={r.paid} />}</TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              )
-            )}
-
-            {tab === "cheques" && (cheques.length === 0 ? <EmptyState title="چکی ثبت نشده است" /> : paymentRows(cheques, true))}
-            {tab === "ledger" && paymentRows(ledger, false)}
-          </Card>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <SearchBox placeholder="کد سفارش، CUS-…، نام یا شرکت" />
+        <div className="flex gap-1 rounded-lg bg-surface-2 p-1 text-[13px] font-bold">
+          {[
+            ["open", "باز"],
+            ["unpaid", "دارای مانده"],
+            ["unpriced", "بدون قیمت"],
+            ["all", "همه"],
+          ].map(([k, l]) => (
+            <Link key={k} href={link(k!)} className={`rounded-md px-3 py-1.5 ${filter === k ? "bg-surface shadow-soft" : "text-muted"}`}>{l}</Link>
+          ))}
         </div>
-        <aside className="grid content-start gap-4 md:grid-cols-2 2xl:grid-cols-1">
-          <Card>
-            <CardHeader title="دریافت به تفکیک روش" description="۳۰ روز اخیر، پرداخت‌های قطعی" />
-            <CardBody className="pt-0">
-              <BarList data={summary.byMethod.sort((a, b) => b.amount - a.amount).map((m) => ({ label: PAYMENT_METHOD[m.method] ?? m.method, value: m.amount, display: formatToman(m.amount) }))} />
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader title="آماده تحویل با مانده" description="تا تسویه یا مجوز مدیر، تحویل انجام نمی‌شود" />
-            <CardBody className="space-y-2 pt-0">
-              {readyBlocked.length === 0 ? <p className="text-[13px] text-muted">موردی نیست.</p> : readyBlocked.map((r) => (
-                <Link key={r.id} href={`/panel/orders/${r.id}`} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-[12.5px] hover:border-line-strong">
-                  <span><OrderNo n={r.number} /> • {r.customerName}</span>
-                  <Money rial={r.balance} strong />
-                </Link>
-              ))}
-            </CardBody>
-          </Card>
-        </aside>
       </div>
+      {rows.length === 0 ? (
+        <EmptyState title="موردی نیست" />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <Table>
+            <THead>
+              <TR>
+                <TH>سفارش</TH>
+                <TH>مشتری</TH>
+                <TH>وضعیت</TH>
+                <TH className="text-end">مبلغ</TH>
+                <TH className="text-end">پرداخت‌شده</TH>
+                <TH className="text-end">مانده</TH>
+                <TH>پرداخت</TH>
+                <TH>فاکتور</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {rows.map((r) => (
+                <TR key={r.id}>
+                  <TD>
+                    <Link href={`/panel/orders/${r.code}?tab=finance`} className="hover:underline"><OrderCode code={r.code} /></Link> <TypeChip type={r.productionType} className="h-5 text-[11px]" />
+                    <span className="block max-w-56 truncate text-[12px] text-muted">{r.title}</span>
+                  </TD>
+                  <TD>
+                    <Link href={`/panel/customers/CUS-${r.customerCode}`} className="block text-[13px] font-bold hover:underline">{r.companyName || r.customerName}</Link>
+                    <span className="text-[11.5px] text-muted"><CustomerCode code={r.customerCode} /> • {CUSTOMER_TYPE[r.customerType]}</span>
+                  </TD>
+                  <TD><Status map={ORDER_STATUS} value={r.status} /></TD>
+                  <TD className="text-end">{r.pricedAt ? <Money rial={r.total} /> : <Badge tone="warning">تعیین نشده</Badge>}</TD>
+                  <TD className="text-end"><Money rial={r.paid} /></TD>
+                  <TD className="text-end">{r.pricedAt ? <Money rial={Math.max(0, r.balance)} strong className={r.balance > 0 ? "text-danger" : ""} /> : "—"}</TD>
+                  <TD>{r.pricedAt ? <Status map={PAYMENT_STATUS} value={r.paymentStatus} /> : "—"}</TD>
+                  <TD>{r.invoiceCount > 0 ? <Badge tone="success">{formatNumber(r.invoiceCount)} فاکتور</Badge> : <span className="text-[12px] text-muted">—</span>}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </div>
+      )}
     </>
+  );
+}
+
+async function Payments({ ctx }: { ctx: Parameters<typeof paymentLedger>[0] }) {
+  const pending = await paymentLedger(ctx, { status: ["AWAITING_APPROVAL"] });
+  const recent = await paymentLedger(ctx, { limit: 60 });
+  return (
+    <div className="space-y-5">
+      {pending.length > 0 && (
+        <section className="overflow-hidden rounded-2xl border border-warning/40 bg-surface shadow-card">
+          <h2 className="border-b border-line bg-warning-soft/50 px-5 py-3 text-[15px] font-bold">منتظر تأیید ({formatNumber(pending.length)})</h2>
+          <ul className="divide-y divide-line">
+            {pending.map(({ payment: p, orderCode, customerName }) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-[13.5px]">
+                <Link href={`/panel/orders/${orderCode}?tab=finance`} className="hover:underline"><OrderCode code={orderCode} /></Link>
+                <span>{customerName}</span>
+                <span className="font-bold"><Money rial={p.amount} /></span>
+                <span className="text-muted">{PAYMENT_METHOD[p.method]}{p.reference ? ` • ${p.reference}` : ""}</span>
+                {p.receiptFileId && <a href={`/api/v1/files/${p.receiptFileId}?inline=1`} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">رسید</a>}
+                {can(ctx, "payment.record") && (
+                  <span className="ms-auto flex gap-2">
+                    <ActionButton path={`payments/${p.id}/approve`} success="پرداخت تأیید شد." size="sm">تأیید</ActionButton>
+                    <ReasonAction path={`payments/${p.id}/reject`} title="رد پرداخت" success="پرداخت رد شد." danger confirmLabel="رد">رد</ReasonAction>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        <Table>
+          <THead>
+            <TR><TH>تاریخ</TH><TH>سفارش</TH><TH>مشتری</TH><TH>روش</TH><TH className="text-end">مبلغ</TH><TH>وضعیت</TH><TH>ثبت‌کننده</TH></TR>
+          </THead>
+          <TBody>
+            {recent.map(({ payment: p, orderCode, customerName, createdByName }) => (
+              <TR key={p.id}>
+                <TD><DateText value={p.createdAt} withTime className="text-[12.5px]" /></TD>
+                <TD><Link href={`/panel/orders/${orderCode}?tab=finance`} className="hover:underline"><OrderCode code={orderCode} /></Link></TD>
+                <TD>{customerName}</TD>
+                <TD>{p.kind === "REFUND" ? "بازپرداخت" : PAYMENT_METHOD[p.method]}</TD>
+                <TD className="text-end"><Money rial={p.kind === "REFUND" ? -p.amount : p.amount} /></TD>
+                <TD><Status map={PAYMENT_RECORD_STATUS} value={p.status} /></TD>
+                <TD className="text-[12.5px] text-muted">{createdByName ?? (p.method === "ONLINE" ? "درگاه" : "—")}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+async function Invoices({ ctx }: { ctx: Parameters<typeof invoiceList>[0] }) {
+  const rows = await invoiceList(ctx);
+  if (rows.length === 0) return <EmptyState title="هنوز فاکتوری صادر نشده" description="از صفحه هر سفارش (بخش مالی) فاکتور رسمی یا غیررسمی صادر کنید." />;
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+      <Table>
+        <THead>
+          <TR><TH>شماره</TH><TH>نوع</TH><TH>سفارش</TH><TH>مشتری</TH><TH className="text-end">مبلغ</TH><TH>تاریخ</TH><TH /></TR>
+        </THead>
+        <TBody>
+          {rows.map(({ invoice: i, orderCode, customerName, customerCode }) => (
+            <TR key={i.id} className={i.status === "VOID" ? "opacity-55" : undefined}>
+              <TD className="font-bold tabular">{formatNumber(i.number)}</TD>
+              <TD>{INVOICE_TYPE[i.type]} {i.status === "VOID" && <Badge tone="neutral">باطل</Badge>}</TD>
+              <TD><OrderCode code={orderCode} /></TD>
+              <TD>{customerName} <CustomerCode code={customerCode} className="text-[11.5px] text-muted" /></TD>
+              <TD className="text-end"><Money rial={i.total} /></TD>
+              <TD><DateText value={i.issuedAt} /></TD>
+              <TD><Link href={`/panel/invoices/${i.id}`} className="font-bold text-accent-ink hover:underline">مشاهده / PDF</Link></TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </div>
   );
 }

@@ -24,7 +24,7 @@ export default async function CatalogPage() {
       p: products,
       category: productCategories.name,
       groups: sql<number>`(select count(*) from product_option_groups g where g.product_id = ${products.id})::int`,
-      orders30: sql<number>`(select count(*) from order_items i join orders o on o.id = i.order_id where i.product_id = ${products.id} and o.placed_at > now() - interval '30 days' and o.status <> 'CANCELLED')::int`,
+      orders30: sql<number>`(select count(*) from order_items i join orders o on o.id = i.order_id where i.product_id = ${products.id} and o.created_at > now() - interval '30 days' and o.status <> 'CANCELLED')::int`,
     })
     .from(products)
     .leftJoin(productCategories, eq(productCategories.id, products.categoryId))

@@ -25,15 +25,10 @@ export async function staffCtx(ref: ReferenceIds, code: string): Promise<Ctx> {
   return createCtx(actor);
 }
 
-export const MANAGER = "E001";
-export const SALES = "E002";
-export const ACCOUNTANT = "E003";
-export const WAREHOUSE = "E004";
-export const DESIGNER = "E005";
-export const PREPRESS = "E006";
-export const OFFSET_OP = "E007";
-export const DIGITAL_OP = "E008";
-export const CUTTER = "E009";
-export const BINDER = "E010";
-export const QC = "E011";
-export const SHIPPING = "E012";
+export const MANAGER = "E001"; // حامد نورصالحی
+export const LABAFI = "E002"; // مدیر دیجیتال
+export const AZAD = "E003"; // اپراتور دیجیتال
+export const ABDALI = "E004"; // حسابدار
+export const GHOLIPOUR = "E005"; // مدیر لیتوگرافی و افست
+export const HAJGHASEMI = "E006"; // تولید افست
+export const MEMARIAN = "E007"; // طراح

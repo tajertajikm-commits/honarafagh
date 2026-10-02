@@ -1,77 +1,81 @@
 /**
- * Action-based permission catalog. Permissions are enforced in the service
- * layer (every interface — REST, server components, workers — goes through it).
- * Roles are stored in the database and map to a subset of these codes.
+ * Permission catalog. Every action is checked in the service layer; roles
+ * (stored in the database) are named sets of these codes, and the panel's
+ * navigation is derived from them. Grouped so the role editor reads well.
  */
-export const PERMISSIONS = {
-  "order.view": "مشاهده سفارش‌ها",
-  "order.create": "ثبت سفارش دستی",
-  "order.edit": "ویرایش سفارش",
-  "order.cancel": "لغو سفارش",
-  "order.price.override": "تغییر دستی قیمت و تخفیف",
-  "order.state.force": "تغییر اجباری وضعیت سفارش",
-  "order.priority.change": "تغییر اولویت سفارش",
-  "quote.view": "مشاهده استعلام و پیش‌فاکتور",
-  "quote.manage": "صدور و مدیریت پیش‌فاکتور",
-  "customer.view": "مشاهده مشتریان",
-  "customer.manage": "مدیریت مشتریان",
-  "file.view": "مشاهده فایل‌های سفارش",
-  "file.upload": "بارگذاری نسخه فایل",
-  "file.review": "تأیید فایل برای چاپ",
-  "production.view": "مشاهده تولید",
-  "production.plan": "برنامه‌ریزی و آزادسازی تولید",
-  "production.assign": "تخصیص کار به اپراتور و ماشین",
-  "production.execute": "اجرای کارهای تولیدی",
-  "production.override": "عبور اجباری، بازگشایی و لغو مرحله",
-  "qc.perform": "انجام کنترل کیفیت",
-  "machine.view": "مشاهده ماشین‌آلات",
-  "machine.manage": "مدیریت ماشین‌آلات و تعمیرات",
-  "inventory.view": "مشاهده موجودی",
-  "inventory.receive": "دریافت کالا",
-  "inventory.issue": "حواله و تحویل مواد",
-  "inventory.reserve": "رزرو و آزادسازی مواد",
-  "inventory.adjust": "اصلاح موجودی",
-  "inventory.waste": "ثبت ضایعات انبار",
-  "procurement.view": "مشاهده تأمین",
-  "procurement.manage": "مدیریت خرید و تأمین‌کنندگان",
-  "payment.view": "مشاهده پرداخت‌ها",
-  "payment.create": "ثبت پرداخت",
-  "payment.approve": "تأیید پرداخت",
-  "payment.refund": "بازپرداخت",
-  "delivery.view": "مشاهده ارسال",
-  "delivery.manage": "مدیریت ارسال",
-  "delivery.execute": "انجام تحویل",
-  "catalog.manage": "مدیریت محصولات",
-  "pricing.view": "مشاهده قوانین قیمت‌گذاری",
-  "pricing.edit": "ویرایش قوانین قیمت‌گذاری",
-  "pricing.publish": "انتشار نسخه قیمت‌گذاری",
-  "workflow.edit": "ویرایش گردش‌کار تولید",
-  "employee.view": "مشاهده کارکنان",
-  "employee.manage": "مدیریت کارکنان",
-  "role.manage": "مدیریت نقش‌ها و مجوزها",
-  "report.view": "مشاهده گزارش‌ها",
-  "audit.view": "مشاهده گزارش ممیزی",
-  "settings.manage": "مدیریت تنظیمات",
+export const PERMISSION_GROUPS = {
+  orders: {
+    title: "سفارش‌ها",
+    items: {
+      "order.view": "مشاهده همه سفارش‌ها",
+      "order.create": "ثبت سفارش برای مشتری",
+      "order.approve.digital": "تأیید سفارش دیجیتال و انتخاب ایستگاه‌ها",
+      "order.approve.offset": "تأیید سفارش افست و انتخاب مراحل",
+      "order.price": "قیمت‌گذاری و تخفیف سفارش سفارشی",
+      "order.priority": "تغییر اولویت صف",
+      "order.cancel": "لغو سفارش",
+    },
+  },
+  artwork: {
+    title: "فایل و طراحی",
+    items: {
+      "artwork.review": "بررسی و تأیید فایل چاپی",
+      "design.work": "انجام طراحی سفارش‌ها",
+    },
+  },
+  digital: {
+    title: "تولید دیجیتال",
+    items: {
+      "digital.queue": "مشاهده صف ایستگاه‌های دیجیتال",
+      "digital.production": "اجرای ایستگاه‌های دیجیتال (شیت، کاغذ، چاپ، برش، سلفون، صحافی)",
+      "digital.quality": "تأیید کیفیت نهایی دیجیتال",
+      "digital.dispatch": "بسته‌بندی و ارسال دیجیتال",
+    },
+  },
+  offset: {
+    title: "تولید افست",
+    items: {
+      "offset.queue": "مشاهده صف ایستگاه‌های افست",
+      "offset.litho": "ثبت و پیگیری لیتوگرافی",
+      "offset.paper": "استعلام قیمت کاغذ از تأمین‌کنندگان",
+      "offset.paper.approve": "انتخاب تأمین‌کننده کاغذ",
+      "offset.press.assign": "تعیین ماشین چاپ",
+      "offset.print": "اجرای چاپ افست",
+      "offset.quality": "تأیید کیفیت چاپ و کیفیت نهایی افست",
+      "offset.postpress": "اجرای برش، سلفون و صحافی افست",
+      "offset.packaging": "بسته‌بندی افست",
+      "offset.shipping": "ارسال افست",
+    },
+  },
+  finance: {
+    title: "مالی و مشتریان",
+    items: {
+      "customer.view": "مشاهده مشتریان",
+      "customer.manage": "ویرایش اطلاعات مشتریان",
+      "payment.view": "مشاهده پرداخت‌ها",
+      "payment.record": "ثبت و تأیید پرداخت",
+      "invoice.manage": "صدور و ابطال فاکتور",
+    },
+  },
+  admin: {
+    title: "مدیریت",
+    items: {
+      "dashboard.view": "داشبورد مدیریت",
+      "inventory.manage": "مدیریت مواد و موجودی",
+      "catalog.manage": "مدیریت محصولات فروشگاه و قیمت‌ها",
+      "employee.manage": "مدیریت کارکنان و نقش‌ها",
+      "audit.view": "مشاهده گزارش ممیزی",
+      "settings.manage": "تنظیمات و اطلاعات فروشنده",
+    },
+  },
 } as const;
 
-export type Permission = keyof typeof PERMISSIONS;
+type Groups = typeof PERMISSION_GROUPS;
+export type Permission = { [G in keyof Groups]: keyof Groups[G]["items"] }[keyof Groups];
+
+export const PERMISSIONS = Object.fromEntries(Object.values(PERMISSION_GROUPS).flatMap((g) => Object.entries(g.items))) as Record<Permission, string>;
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
 
 export function isPermission(value: string): value is Permission {
   return Object.hasOwn(PERMISSIONS, value);
 }
-
-/** UI workspaces. A role lists the workspaces its members see. */
-export const WORKSPACES = {
-  control: { label: "مرکز کنترل", href: "/panel/control" },
-  sales: { label: "فروش", href: "/panel/sales" },
-  accounting: { label: "مالی", href: "/panel/accounting" },
-  procurement: { label: "تأمین", href: "/panel/procurement" },
-  warehouse: { label: "انبار", href: "/panel/warehouse" },
-  studio: { label: "طراحی و پیش از چاپ", href: "/panel/studio" },
-  station: { label: "ایستگاه کار", href: "/panel/station" },
-  qc: { label: "کنترل کیفیت", href: "/panel/qc" },
-  shipping: { label: "ارسال", href: "/panel/shipping" },
-} as const;
-export type Workspace = keyof typeof WORKSPACES;
-export const ALL_WORKSPACES = Object.keys(WORKSPACES) as Workspace[];

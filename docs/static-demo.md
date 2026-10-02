@@ -49,9 +49,9 @@ node demo/build.mjs --base=/my-folder     # or --base=  for the domain root
 | `/printing-demo/products/`, `/printing-demo/p/item/?__id=business-card` | Catalogue and product configurator |
 | `/printing-demo/cart/`, `/checkout/`, `/payment/sandbox/`, `/payment/result/` | Purchase flow |
 | `/printing-demo/login/` | Customer OTP login |
-| `/printing-demo/account/…` | Customer account (orders, quotes, profile) |
+| `/printing-demo/account/…` | Customer account (orders, invoices, profile) |
 | `/printing-demo/panel/login/` | Staff login |
-| `/printing-demo/panel/…` | Internal workspaces (orders, studio, station, warehouse, QC, shipping, accounting, reports, …) |
+| `/printing-demo/panel/…` | Staff panel (my work, dashboard, Digital/Offset queues, orders, accounting, …) |
 
 Static hosting cannot answer `/orders/<id>` without server rewrites. Each detail page is
 therefore exported once, as `…/item/`, and the id travels as `?__id=<id>`. Links do this
@@ -112,7 +112,7 @@ Checkout goes to the **sandbox gateway** page, which has three outcomes:
 
 | Button | Result |
 |---|---|
-| پرداخت موفق | Payment verified; the order is marked paid (fully or by deposit) and production can start |
+| پرداخت موفق | Payment verified; the payment is recorded on the order |
 | پرداخت ناموفق (رد توسط بانک) | The bank callback returns, verification fails, the attempt is recorded as failed and the order stays unpaid |
 | انصراف | Cancelled by the user; the attempt is recorded as cancelled |
 
@@ -168,7 +168,7 @@ Everything else runs the real production code in the browser:
 
 * customer accounts and carts
 * pricing, checkout, orders, invoices and payments ledger
-* workflows (the Offset DAG and the Digital flow), tasks and stations
+* orders in every stage of the Digital and Offset flows
 * QC, packaging, delivery
 * inventory reservations and consumption
 * employees and permissions

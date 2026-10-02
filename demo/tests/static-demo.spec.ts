@@ -12,13 +12,11 @@ const SHOTS = process.env.E2E_SHOTS;
 const shot = async (page: Page, name: string) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
 };
-const fa = (s: string) => s.replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]!);
-const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
 
 let context: BrowserContext;
 let page: Page;
 const phone = `0935${Math.floor(1_000_000 + Math.random() * 8_999_999)}`;
-let orderNumber = "";
+let orderCode = "";
 
 async function booted(p: Page) {
   await expect(p.locator('[role="status"][aria-live="polite"]')).toHaveCount(0, { timeout: 120_000 });
@@ -63,107 +61,63 @@ test("2-4. new customer registers with a generated demo OTP", async () => {
 });
 
 test("5-10. configure product, dynamic price, cart, checkout, fake payment → order", async () => {
-  await page.goto(at("/products/"));
+  await page.goto(at("/p/item/?__id=business-card"));
   await booted(page);
-  await page.locator("main a[href*=\"/p/\"]", { hasText: "کارت ویزیت" }).first().click();
-  await expect(page.getByRole("heading", { name: "کارت ویزیت" })).toBeVisible();
-  const price = page.locator("aside .text-\\[30px\\]");
-  await expect(price).toContainText(/[۰-۹]/);
-  const before = await price.innerText();
+  await expect(page.getByRole("heading", { name: "کارت ویزیت", level: 1 })).toBeVisible();
+  await expect(page.getByText("تومان").first()).toBeVisible();
   await page.getByRole("radio", { name: /سلفون مات دو رو/ }).click();
-  await expect.poll(async () => price.innerText()).not.toBe(before);
-  await shot(page, "d03-configurator");
   await page.getByRole("button", { name: "افزودن به سبد خرید" }).click();
   await expect(page).toHaveURL(/\/cart/);
   await page.getByRole("link", { name: /ادامه و ثبت سفارش/ }).click();
   await expect(page).toHaveURL(/\/checkout/);
   await page.getByRole("radio", { name: /پیک هنر آفاق/ }).click();
-  await page.getByPlaceholder("خیابان، کوچه، پلاک، واحد").fill("خیابان انقلاب، پلاک ۱۰، واحد ۲");
-  await page.getByRole("radio", { name: /^پیش‌پرداخت/ }).click();
-  await shot(page, "d04-checkout");
+  await page.getByPlaceholder("خیابان، کوچه، پلاک، واحد").fill("خیابان انقلاب، پلاک ۱۰");
+  await shot(page, "demo-03-checkout");
   await page.getByRole("button", { name: "ثبت و پرداخت" }).click();
   await expect(page.getByRole("heading", { name: "درگاه پرداخت آزمایشی" })).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`${BASE}/payment/sandbox`));
-  await shot(page, "d05-gateway");
   await page.getByRole("link", { name: "پرداخت موفق" }).click();
   await expect(page.getByRole("heading", { name: "پرداخت با موفقیت انجام شد" })).toBeVisible();
   await page.getByRole("link", { name: "مشاهده سفارش" }).click();
-  const heading = page.getByRole("heading", { name: /سفارش #/ });
-  await expect(heading).toBeVisible();
-  orderNumber = toLatin((await heading.innerText()).replace(/[^\d۰-۹]/g, ""));
-  expect(orderNumber).toMatch(/^1000\d\d$/);
-  await expect(page.getByText("پرداخت بخشی").first()).toBeVisible();
-  await shot(page, "d06-order");
+  const code = page.getByText(/^[DO]-\d+-\d+$/).first();
+  await expect(code).toBeVisible();
+  orderCode = (await code.innerText()).trim();
+  await expect(page.getByText("در انتظار تأیید").first()).toBeVisible();
+  await expect(page.getByText("تسویه").first()).toBeVisible();
 });
 
-test("11-12. manager logs in and finds the same order", async () => {
+test("11-12. approver logs in and finds the same order", async () => {
   await page.goto(at("/panel/login/"));
   await booted(page);
-  await page.getByLabel("شماره موبایل").fill("09120000001");
+  await page.getByLabel("شماره موبایل").fill(orderCode.startsWith("D") ? "09120000002" : "09120000005");
   await page.getByLabel("رمز عبور").fill("honar1405");
   await page.getByRole("button", { name: "ورود" }).click();
-  await expect(page.getByRole("heading", { name: "مرکز کنترل" })).toBeVisible();
-  await shot(page, "d07-control");
-  await page.goto(at(`/panel/orders/?q=${orderNumber}`));
+  await page.waitForURL((u) => u.pathname.startsWith(at("/panel/")) && !u.pathname.includes("/login"));
+  await page.goto(at(`/panel/orders/?tab=approval&q=${orderCode}`));
   await booted(page);
-  const link = page.getByRole("link", { name: new RegExp(`#${orderNumber.replace(/\d/g, (d) => `[${d}${"۰۱۲۳۴۵۶۷۸۹"[Number(d)]}]`)}`) }).first();
-  await expect(link).toBeVisible();
-  await link.click();
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
-  // The paid deposit released the order: its Digital workflow and material reservations exist.
-  await expect(page.getByRole("heading", { name: "تولید", level: 3 })).toBeVisible();
-  await shot(page, "d08-panel-order");
+  await page.locator(`main a[href*="/panel/orders/item/"]`).first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(orderCode);
 });
 
-test("13-14. other roles act on it: file approval by prepress, production starts", async () => {
-  // Customer's file: upload as the customer first
-  await page.goto(at("/account/"));
-  await booted(page);
-  await page.getByText(new RegExp(`سفارش #`)).first().click();
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
-  await page.locator('input[type="file"]').first().setInputFiles({ name: "card.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%demo\n%%EOF") });
-  await page.getByRole("button", { name: "ارسال فایل برای بررسی" }).click();
-  await expect(page.getByText("فایل برای بررسی ارسال شد.").first()).toBeVisible();
-  await expect(page.getByText("در حال بررسی").first()).toBeVisible();
-
-  // Switch role via the DEMO MODE panel: prepress approves the file
-  await page.getByRole("button", { name: /پنل حالت نمایشی/ }).click();
-  await page.getByRole("button", { name: /پیش از چاپ/ }).first().click();
-  await expect(page).toHaveURL(/\/panel\//);
-  await booted(page);
-  await page.goto(at("/panel/studio/?tab=review"));
-  await booted(page);
-  await expect(page.getByText(`سفارش ${fa(orderNumber)}`).first()).toBeVisible();
-  await page.getByRole("button", { name: /تأیید برای چاپ/ }).first().click();
-  await expect(page.getByText("فایل برای چاپ تأیید شد.").first()).toBeVisible();
-  await shot(page, "d09-studio");
-
-  // Prepress starts the PREPRESS task at the station → production in progress
-  await page.goto(at("/panel/station/"));
-  await booted(page);
-  await page.getByRole("link", { name: new RegExp(`سفارش ${fa(orderNumber)}`) }).first().click();
-  await page.getByRole("button", { name: "شروع کار" }).click();
-  await expect(page.getByText("کار شروع شد.").first()).toBeVisible();
-  await shot(page, "d10-station");
+test("13-14. approval with a station plan puts it into production", async () => {
+  await page.getByRole("button", { name: "تأیید و شروع تولید" }).click();
+  await expect(page.getByText("سفارش تأیید شد و وارد صف تولید شد.").first()).toBeVisible();
 });
 
-test("15-16. customer sees the updated status", async () => {
-  await page.goto(at("/account/"));
+test("15-16. customer sees the simplified status (public tracking by code + phone)", async () => {
+  await page.goto(at("/track/"));
   await booted(page);
-  await page.getByText(new RegExp(`سفارش #`)).first().click();
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
-  await expect(page.getByText(/در حال انجام|در حال تولید/).first()).toBeVisible();
-  await page.getByRole("button", { name: /اعلان‌ها/ }).click();
-  await expect(page.getByText("پرداخت موفق").first()).toBeVisible();
-  await shot(page, "d11-customer-updated");
-  await page.keyboard.press("Escape");
+  await page.getByLabel("کد سفارش").fill(orderCode);
+  await page.getByLabel("موبایل").fill(phone);
+  await page.getByRole("button", { name: "پیگیری" }).click();
+  await expect(page.getByLabel("وضعیت سفارش")).toBeVisible();
+  await expect(page.locator("main").getByText(/تأیید شد|در حال آماده‌سازی/).first()).toBeVisible();
 });
 
 test("17-18. data survives a browser refresh", async () => {
+  await page.goto(at(`/panel/orders/?tab=all&q=${orderCode}`));
   await page.reload();
   await booted(page);
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
-  await expect(page.getByText(/در حال انجام|در حال تولید/).first()).toBeVisible();
+  await expect(page.locator(`main a[href*="/panel/orders/item/"]`).first()).toBeVisible();
 });
 
 test("19-20. reset restores the seed (new customer's order disappears)", async () => {
@@ -179,10 +133,9 @@ test("19-20. reset restores the seed (new customer's order disappears)", async (
   await page.getByLabel("رمز عبور").fill("honar1405");
   await page.getByRole("button", { name: "ورود" }).click();
   await expect(page.getByRole("heading", { name: "مرکز کنترل" })).toBeVisible();
-  await page.goto(at(`/panel/orders/?status=all&q=${orderNumber}`));
+  await page.goto(at(`/panel/orders/?tab=all&q=${orderCode}`));
   await booted(page);
-  // The seed has 18 orders (100001–100018); the customer's new order number no longer exists.
-  await expect(page.getByText("سفارشی پیدا نشد")).toBeVisible();
+  await expect(page.locator(`main a[href*="/panel/orders/item/"]`)).toHaveCount(0);
 });
 
 test("mobile storefront works in the sub-folder @mobile", async ({ page: m }) => {

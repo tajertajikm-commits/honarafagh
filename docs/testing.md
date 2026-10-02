@@ -6,33 +6,25 @@
 | Integration | Vitest | `pnpm test` | `honar_test` (reset automatically; refuses any DB without `_test`) |
 | End-to-end | Playwright | `pnpm test:e2e` | the dev database, seeded (`pnpm db:reset && pnpm db:seed`) |
 
-## Unit (48 tests)
+## Unit (34 tests)
 
-- `pricing-engine.test.ts`: imposition and fit count, offset vs digital costing, plates/make-ready/waste, stock sheet yield, operations by every basis, markup tiers, urgency, discounts, minimum order, rounding, VAT, method selection, validation errors.
-- `workflow-graph.test.ts`: condition evaluation, pruning with transitive dependencies, parallel branches, readiness with drying lag, rework paths, template validation (cycles, unknown dependencies, QC targets).
-- `scheduling.test.ts`: work calendar (Tehran time, rollover, Thursday half-day, Friday off), dependencies, spreading across machines by priority, maintenance windows, gates clearing later (paper arriving), late detection, missing machine types.
+- `pricing-engine.test.ts`: imposition, offset vs digital costing, operations, markup, urgency, discounts, rounding, VAT, method selection.
+- `workflow.test.ts`: station plans (required stations, normalisation), phase readiness, derived order status, quality return targets, blocked reasons.
 
-## Integration (41 tests)
+## Integration (36 tests)
 
-- `seed.test.ts`: reference data integrity.
-- `inventory.test.ts`: every transaction type, partial reservation plus a shortage request, allocation on receipt, the append-only ledger, and a **10-way concurrent reservation race** that never over-reserves.
-- `order-lifecycle.test.ts`: the full scenario of 100 notebooks with the design service: price snapshot, confirmation, reservations, proof rejected/approved, parallel gates, printing with pause/block/resume, consumption and waste, drying lag, final QC rejection and rework, **back-flushed operation supplies**, a delivery blocked until settled, partial and full delivery, completion only when delivered and paid, a customer-safe timeline and audit. Also an offset order through the flowchart workflow, and cancellation rules.
-- `payments-pricing.test.ts`: online payment callback idempotency, manual payment approval, refunds, deposit gate, pricing versions (immutability, publish permission, snapshots unaffected), quotes.
-- `delivery-rules.test.ts`: the settlement gate (open balance blocked; customer credit limit; manager override; setting switch; fully paid).
+- `workflows.test.ts`: the full **Digital** flow (customer → Labafi approval with station plan → artwork review → every station → Labafi QC → packaging → shipping → customer stage) and the full **Offset** flow (approval → litho ‖ paper → quotes → Hamed chooses supplier → press → priority with charge → print → Hamed print QC → post-press → Hamed final QC → packaging → shipping), plus permissions (who may approve, QC, choose suppliers), partial station plans, QC rejection and rework, design requests, reject / needs-info, pricing before payment, per-process queues and customer isolation.
+- `payments-pricing.test.ts`: store checkout (server re-pricing, idempotency, a mixed cart split into one order per process), payment callbacks, transfer receipts, refunds, official/unofficial invoices with immutable snapshots, discount allocation, pricing versions.
+- `seed.test.ts`, `actor-resolution.test.ts`.
 
-## End-to-end (8 tests)
+## End-to-end (6 tests, `tests/e2e`)
 
-- Customer (desktop): browse → configure → cart → OTP login → checkout → sandbox payment → order page → tracking.
-- Customer (mobile, Pixel 7): demo customer's order history and a proof awaiting approval.
-- Staff (desktop):
-  - Manager: login → control center → manual order with live pricing.
-  - Warehouse: issue reserved material → receive a purchase order → ledger.
-  - Operator: start and finish a step at the station.
-  - Operator: forbidden from other workspaces and APIs.
-  - Accountant: settles a balance.
-  - Shipping: creates and hands over the shipment, and the order completes.
+- `workflows.spec.ts`: Digital and Offset flows through the real UI, each step logged in as the person who does it; the customer sees only the simplified stage; public tracking by code + phone; role isolation.
+- `customer.spec.ts`: store purchase (configure → cart → OTP → checkout → sandbox payment) and a mobile account check.
 
-E2E tests mutate the demo data; reseed afterwards.
+Run against a freshly seeded database (`pnpm db:reset && pnpm db:seed`): the tests mutate data, and the OTP cooldown applies per phone.
+
+Static demo: `pnpm demo:test` (see `demo/tests/playwright.config.ts`).
 
 ## Other checks
 

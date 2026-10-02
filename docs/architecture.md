@@ -55,10 +55,9 @@ timeline and the staff history.
 
 ### Production
 
-`production/engine.ts` instantiates a workflow template per order item (see
-[workflows](workflows.md)). Conditions prune steps; gates (file approval,
-materials, deposit) complete automatically when the other domain is satisfied;
-steps become `READY` when their dependencies (and any drying lag) are met.
+`workflow/engine.ts` creates one step per station the approver selected (see
+[workflows](workflows.md)). Steps become `READY` when every selected step of earlier
+phases is done; stations that need artwork wait for the approved file or design.
 Rework creates new attempts of the same step key, so history is never
 overwritten.
 
@@ -84,14 +83,14 @@ required/reserved/issued/consumed/wasted/returned.
 Services emit to `outbox_events`. The worker (`pnpm worker`, or inline in dev)
 claims batches with `FOR UPDATE SKIP LOCKED`, dispatches notifications (SMS +
 in-app, deduplicated) and accounting sync, and retries with backoff. Periodic
-jobs refresh schedule projections, expire quotes and clean up sessions and OTPs.
+jobs clean up sessions and OTPs.
 
 ### Security
 
 - Opaque session tokens (only the SHA-256 hash is stored); separate cookies for staff (12 h) and customers (30 d); `HttpOnly`, `SameSite=Lax`, `Secure` in production.
 - Staff passwords use scrypt. Customer login uses OTP (HMAC-stored code, 5 attempts max, rate limited).
 - Same-origin check on mutating API calls; DB-backed fixed-window rate limits on login, OTP, tracking and pricing.
-- IDOR protection: every read of orders, files, payments and quotes checks ownership (customer) or permission (staff).
+- IDOR protection: every read of orders, files, payments and invoices checks ownership (customer) or permission (staff).
 - Uploads: magic-byte sniffing, per-purpose allow lists, size caps, random storage keys, never overwritten, served through an authorised route.
 - Drizzle parameterised queries only; React escaping; security headers in `next.config.ts`.
 - Secrets only from environment variables. Production refuses to start with the default session secret or fake providers unless `DEMO_MODE=true`.
@@ -99,5 +98,5 @@ jobs refresh schedule projections, expire quotes and clean up sessions and OTPs.
 ### UI
 
 - The storefront is mobile-first, with a bottom navigation, a sticky price bar in the configurator and OTP login.
-- The panel is desktop-first. Workspaces are built around jobs: control, station (operators), studio, QC, sales, accounting, warehouse, procurement and shipping. Shared modules and admin pages sit alongside them.
+- The panel is desktop-first. Each person lands on «کارهای من» (only what they can act on now); managers land on the control center. Digital and Offset queues, accounting, customers and admin pages sit alongside it.
 - Numbers use Persian digits and toman. Identifiers (phones, SKUs, tracking codes) stay Latin inside LTR isolates. The bullet `•` is the separator, because the middle dot `·` is indistinguishable from the Persian zero `۰`.

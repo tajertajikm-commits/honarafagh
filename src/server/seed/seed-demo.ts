@@ -1,309 +1,275 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import * as t from "@/server/db/schema";
 import { loadStaffActor } from "@/server/auth/sessions";
 import { createCtx, type Ctx } from "@/server/core/context";
-import { completeShipment, createShipment, dispatchShipment } from "@/server/modules/delivery/service";
-import { addArtworkVersion, reviewArtwork, sendProof, storeUpload } from "@/server/modules/files/service";
-import { recordManualPayment } from "@/server/modules/finance/service";
-import { issueRequirement } from "@/server/modules/inventory/service";
-import { confirmOrder, createManualOrder } from "@/server/modules/orders/service";
-import { createPurchaseOrder } from "@/server/modules/procurement/service";
-import { completeTask, pauseTask, reportIssue, startTask } from "@/server/modules/production/tasks";
-import { recordInspection } from "@/server/modules/qc/service";
-import { createInquiry, createQuote, sendQuote } from "@/server/modules/quotes/service";
-import { scheduleMaintenance } from "@/server/modules/machines/service";
-import type { Selections } from "@/server/modules/pricing/types";
+import { storeUpload } from "@/server/modules/files/service";
+import { handlePaymentCallback, recordManualPayment, startOnlinePayment } from "@/server/modules/finance/service";
+import { issueInvoice } from "@/server/modules/finance/invoices";
+import { addCartItem, cartView, getOrCreateCart } from "@/server/modules/orders/cart";
+import { approveOrder, requestInfo, setOrderPrice } from "@/server/modules/orders/approval";
+import { reviewArtwork, startDesign } from "@/server/modules/orders/artwork";
+import { checkout, createCustomOrder, type CustomOrderInput } from "@/server/modules/orders/create";
+import { addSupplierQuote, decidePaperSupplier, markPaperReceived, saveLithoJob } from "@/server/modules/offset/service";
+import { dispatchOrder, markDelivered } from "@/server/modules/shipping/service";
+import { assignMachine, completeStep, decideQuality, setPriority, startStep } from "@/server/modules/workflow/engine";
 import type { ReferenceIds } from "./seed-reference";
 
-const PDF = Buffer.from("%PDF-1.4\n% Honar Afagh demo artwork\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+const PDF = Buffer.from("%PDF-1.4\n% Honar Afagh demo artwork\n1 0 obj << /Type /Catalog >> endobj\n%%EOF\n");
 
 export const DEMO_CUSTOMERS = [
-  { phone: "09121111111", fullName: "نیلوفر کاظمی", type: "INDIVIDUAL" as const, companyName: null },
-  { phone: "09122222222", fullName: "آرش بهرامی", type: "COMPANY" as const, companyName: "کافه رستوران سپید" },
-  { phone: "09123333333", fullName: "مریم فرهادی", type: "COMPANY" as const, companyName: "آموزشگاه زبان پویا" },
-  { phone: "09124444444", fullName: "حمید صالحی", type: "COMPANY" as const, companyName: "داروخانه دکتر صالحی" },
-  { phone: "09125555555", fullName: "سپیده عطایی", type: "INDIVIDUAL" as const, companyName: null },
-  { phone: "09126666666", fullName: "شرکت فناوران ماهان", type: "COMPANY" as const, companyName: "فناوران ماهان" },
+  { phone: "09121111111", fullName: "سارا احمدی", type: "INDIVIDUAL" as const, nationalId: "0012345678" },
+  { phone: "09122222222", fullName: "حمید صالحی", type: "COMPANY" as const, companyName: "شرکت پخش البرز", nationalId: "10320654789", economicCode: "411477852369", billingAddress: "تهران، خیابان مطهری، پلاک ۴۰" },
+  { phone: "09123333333", fullName: "مریم کاظمی", type: "INDIVIDUAL" as const },
+  { phone: "09124444444", fullName: "رضا نیک‌پور", type: "COMPANY" as const, companyName: "کافه رستوران سپیدار", nationalId: "14006543210", economicCode: "411099887766", billingAddress: "تهران، شهرک غرب، بلوار دادمان" },
+  { phone: "09125555555", fullName: "نازنین رحیمی", type: "INDIVIDUAL" as const },
+  { phone: "09126666666", fullName: "علی مرادی", type: "COMPANY" as const, companyName: "انتشارات نگاه نو", nationalId: "10102233445", economicCode: "411566778899", billingAddress: "تهران، خیابان انقلاب، کوچه مینو" },
 ];
 
+/**
+ * A realistic snapshot of the printing house: Digital and Offset orders at
+ * every stage, created through the real services (so every record is
+ * consistent), then aged so queues and history look like a working week.
+ */
 export async function seedDemo(db: Database, ref: ReferenceIds) {
-  const staff = async (code: string): Promise<Ctx> => {
-    const a = await loadStaffActor(db, ref.employees.get(code)!.userId);
-    return { ...createCtx(a!), db };
+  const staff = async (key: string) => createCtx((await loadStaffActor(db, ref.employees.get(key)!.userId))!);
+  const s = {
+    hamed: await staff("hamed"),
+    labafi: await staff("labafi"),
+    azad: await staff("azad"),
+    abdali: await staff("abdali"),
+    gholipour: await staff("gholipour"),
+    hajghasemi: await staff("hajghasemi"),
+    memarian: await staff("memarian"),
   };
-  const mgr = await staff("E001");
-  const sales = await staff("E002");
-  const acc = await staff("E003");
-  const wh = await staff("E004");
-  const designer = await staff("E005");
-  const prepress = await staff("E006");
-  const offsetOp = await staff("E007");
-  const digitalOp = await staff("E008");
-  const cutter = await staff("E009");
-  const binder = await staff("E010");
-  const qc = await staff("E011");
-  const shipper = await staff("E012");
-
-  // Customers (with login identities so OTP login lands on their history)
-  const customers: { id: string; userId: string; ctx: Ctx }[] = [];
+  const customers: { id: string; ctx: Ctx }[] = [];
   for (const c of DEMO_CUSTOMERS) {
     const [u] = await db.insert(t.users).values({ phone: c.phone, fullName: c.fullName, kind: "CUSTOMER" }).returning();
-    const [row] = await db.insert(t.customers).values({ phone: c.phone, fullName: c.fullName, type: c.type, companyName: c.companyName, userId: u!.id, discountPct: c.type === "COMPANY" ? 5 : 0 }).returning();
-    await db.insert(t.addresses).values({ customerId: row!.id, title: "محل کار", province: "تهران", city: "تهران", line: "خیابان ولیعصر، بالاتر از میدان ونک، پلاک ۲۴۰، واحد ۳", postalCode: "1969714511", recipientName: c.fullName, recipientPhone: c.phone, isDefault: true });
-    customers.push({ id: row!.id, userId: u!.id, ctx: { ...createCtx({ kind: "customer", userId: u!.id, customerId: row!.id, name: c.fullName }), db } });
+    const [row] = await db.insert(t.customers).values({ ...c, userId: u!.id }).returning();
+    await db.insert(t.addresses).values({ customerId: row!.id, title: "محل کار", province: "تهران", city: "تهران", line: c.billingAddress ?? "تهران، خیابان آزادی، پلاک ۱۲", recipientName: c.fullName, recipientPhone: c.phone, isDefault: true });
+    customers.push({ id: row!.id, ctx: createCtx({ kind: "customer", userId: u!.id, customerId: row!.id, name: c.fullName }) });
   }
-  const courier = ref.deliveryMethods.get("COURIER")!;
-  const pickup = ref.deliveryMethods.get("PICKUP")!;
-  const addr = (i: number) => ({ province: "تهران", city: "تهران", line: "خیابان ولیعصر، پلاک ۲۴۰", recipientName: DEMO_CUSTOMERS[i]!.fullName, recipientPhone: DEMO_CUSTOMERS[i]!.phone });
+  const [sara, hamid, maryam, reza, nazanin, ali] = customers as [(typeof customers)[number], (typeof customers)[number], (typeof customers)[number], (typeof customers)[number], (typeof customers)[number], (typeof customers)[number]];
 
-  const order = async (ci: number, slug: string, quantity: number, selections: Selections, opts: { priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT"; delivery?: string; confirm?: boolean } = {}) => {
-    const o = await createManualOrder(sales, {
-      customerId: customers[ci]!.id,
-      items: [{ productId: ref.products.get(slug)!, quantity, selections }],
-      priority: opts.priority,
-      deliveryMethodId: opts.delivery ?? courier,
-      address: opts.delivery === pickup ? null : addr(ci),
-      source: "PHONE",
-    });
-    const [item] = await db.select().from(t.orderItems).where(eq(t.orderItems.orderId, o.id));
-    return { id: o.id, itemId: item!.id, total: o.total };
+  let key = 0;
+  const order = async (c: { ctx: Ctx }, input: Omit<CustomOrderInput, "idempotencyKey" | "artworkFileIds"> & { file?: string }) => {
+    const fileIds = input.file ? [(await storeUpload(c.ctx, { data: PDF, filename: input.file, purpose: "ARTWORK" })).id] : [];
+    return createCustomOrder(c.ctx, { ...input, artworkFileIds: fileIds, idempotencyKey: `seed-${++key}` });
   };
-  const tasks = async (orderId: string) => {
-    const rows = await db.select().from(t.productionTasks).where(eq(t.productionTasks.orderId, orderId)).orderBy(asc(t.productionTasks.attempt));
-    return new Map(rows.map((r) => [r.stepKey, r]));
+  const step = async (orderId: string, k: string) => (await db.select().from(t.productionSteps).where(eq(t.productionSteps.orderId, orderId))).find((x) => x.key === k)!.id;
+  const approveArt = async (orderId: string, who: Ctx) => {
+    const [a] = await db.select().from(t.artworkFiles).where(eq(t.artworkFiles.orderId, orderId));
+    await reviewArtwork(who, a!.id, { approve: true });
   };
-  const uploadAndApprove = async (ci: number, itemId: string) => {
-    const f = await storeUpload(customers[ci]!.ctx, { data: PDF, filename: "artwork.pdf", purpose: "ARTWORK" });
-    const v = await addArtworkVersion(customers[ci]!.ctx, itemId, { fileId: f.id, stage: "CUSTOMER_ORIGINAL" });
-    await reviewArtwork(prepress, v.id, { decision: "APPROVE", note: "فایل استاندارد است" });
+  const run = async (orderId: string, who: Ctx, keys: string[]) => {
+    for (const k of keys) await completeStep(who, await step(orderId, k));
   };
-  const pay = (orderId: string, amount: number, method: "POS" | "CASH" | "BANK_TRANSFER", key: string) => recordManualPayment(acc, orderId, { method, amount, reference: method === "BANK_TRANSFER" ? "7731" + key.length : null, idempotencyKey: key });
-  /**
-   * Seeded history is produced in seconds; give each completed task a
-   * realistic, sequential duration (estimate × 0.85–1.3) so production,
-   * machine and labour reports have meaningful numbers.
-   */
-  const respaceHistory = async (orderId: string, seedNo: number) => {
-    const [o] = await db.select({ placedAt: t.orders.placedAt }).from(t.orders).where(eq(t.orders.id, orderId));
-    const list = await db.select().from(t.productionTasks).where(and(eq(t.productionTasks.orderId, orderId), eq(t.productionTasks.status, "COMPLETED"))).orderBy(asc(t.productionTasks.completedAt));
-    let cursor = new Date(o!.placedAt.getTime() + 2 * 3_600_000);
-    for (const [k, task] of list.entries()) {
-      const factor = 0.85 + (((seedNo * 7 + k * 13) % 10) / 10) * 0.45;
-      const minutes = task.gate ? 0 : Math.max(5, Math.round((task.estimatedMinutes || 20) * factor));
-      const start = cursor;
-      const end = new Date(start.getTime() + minutes * 60_000);
-      await db.update(t.productionTasks).set({ startedAt: task.gate ? null : start, completedAt: end }).where(eq(t.productionTasks.id, task.id));
-      await db.update(t.taskTimeLogs).set({ startedAt: start, endedAt: end }).where(eq(t.taskTimeLogs.taskId, task.id));
-      cursor = new Date(end.getTime() + (task.gate ? 0 : 20 * 60_000));
-    }
-    await db.execute(sql`UPDATE orders SET ready_at = ${cursor}, completed_at = ${cursor}::timestamptz + interval '1 day' WHERE id = ${orderId}`);
+  const paper = (sku: string) => ref.materials.get(sku)!;
+  const sup = (k: string) => ref.suppliers.get(k)!;
+  const press = (code: string) => ref.machines.get(code)!;
+  const payCash = (orderId: string, amount: number) => recordManualPayment(s.abdali, orderId, { method: "POS", amount, idempotencyKey: `seed-${orderId.slice(0, 8)}` });
+  const DIGITAL_FULL = ["D_SHEET", "D_PAPER", "D_PRINT", "D_CUT", "D_LAMINATION", "D_QUALITY", "D_PACKAGING"];
+
+  // ── Digital ────────────────────────────────────────────────────────────────
+  const d1 = await order(sara, { productionType: "DIGITAL", title: "کارت ویزیت شخصی", quantity: 200, dimensions: "۵×۹ سانتی‌متر", material: "کتان ۳۰۰ گرم", colors: "چهاررنگ دو رو", finishing: "گوشه گرد", needsDesign: false, file: "business-card.pdf" });
+  const d2 = await order(maryam, { productionType: "DIGITAL", title: "کارت دعوت جشن تولد", quantity: 80, dimensions: "A6", material: "گلاسه ۳۰۰", colors: "چهاررنگ یک رو", finishing: "سلفون براق", needsDesign: true, requestedDeadline: new Date(Date.now() + 5 * 86_400_000) });
+  const d3 = await order(nazanin, { productionType: "DIGITAL", title: "پوستر نمایشگاه نقاشی", quantity: 15, dimensions: "۵۰×۷۰", material: "", colors: "چهاررنگ", needsDesign: false, file: "poster.pdf" });
+  await requestInfo(s.labafi, d3.id, { notes: "جنس کاغذ پوستر را مشخص کنید؛ گلاسه ۱۷۰ یا فتو گلاسه؟" });
+
+  const d4 = await order(reza, { productionType: "DIGITAL", title: "منوی رستوران", quantity: 40, dimensions: "A4 دولت", material: "گلاسه ۳۰۰", colors: "چهاررنگ دو رو", finishing: "سلفون مات", needsDesign: false, file: "menu.pdf" });
+  await approveOrder(s.labafi, d4.id, { steps: ["D_SHEET", "D_PAPER", "D_PRINT", "D_CUT", "D_LAMINATION", "D_PACKAGING"] });
+  await setOrderPrice(s.abdali, d4.id, { amount: 9_500_000, discount: 0 });
+  await approveArt(d4.id, s.labafi);
+  await run(d4.id, s.azad, ["D_SHEET"]);
+  await completeStep(s.azad, await step(d4.id, "D_PAPER"), { materialId: paper("P-GL300-SRA3"), quantity: 25 });
+  await startStep(s.azad, await step(d4.id, "D_PRINT"));
+  await setPriority(s.labafi, d4.id, { isPriority: true, reason: "افتتاحیه رستوران پنجشنبه است", charge: 1_500_000 });
+
+  const d5 = await order(sara, { productionType: "DIGITAL", title: "برچسب شیشه عسل", quantity: 500, dimensions: "دایره ۶ سانتی‌متر", material: "استیکر گلاسه", colors: "چهاررنگ", finishing: "برش فرم", needsDesign: false, file: "label.pdf" });
+  await approveOrder(s.labafi, d5.id, { steps: ["D_PAPER", "D_PRINT", "D_CUT", "D_PACKAGING"] });
+  await setOrderPrice(s.abdali, d5.id, { amount: 6_200_000, discount: 200_000 });
+  await approveArt(d5.id, s.labafi);
+  await completeStep(s.azad, await step(d5.id, "D_PAPER"), { materialId: paper("P-STK-SRA3"), quantity: 30 });
+  await run(d5.id, s.azad, ["D_PRINT"]);
+
+  const d6 = await order(hamid, { productionType: "DIGITAL", title: "کاتالوگ محصولات (نسخه نمونه)", quantity: 30, dimensions: "A4", material: "گلاسه ۱۳۵ و جلد ۳۰۰", colors: "چهاررنگ", finishing: "سلفون جلد، صحافی منگنه", needsDesign: false, file: "catalog.pdf" });
+  await approveOrder(s.hamed, d6.id, { steps: [...DIGITAL_FULL, "D_BINDING"], price: { amount: 14_000_000 } });
+  await approveArt(d6.id, s.labafi);
+  await run(d6.id, s.azad, ["D_SHEET"]);
+  await completeStep(s.azad, await step(d6.id, "D_PAPER"), { materialId: paper("P-GL135-SRA3"), quantity: 120 });
+  await run(d6.id, s.azad, ["D_PRINT", "D_CUT", "D_LAMINATION", "D_BINDING"]);
+  await payCash(d6.id, 7_000_000);
+
+  const d7 = await order(ali, { productionType: "DIGITAL", title: "جلد کتاب (نمونه چاپ)", quantity: 10, dimensions: "رقعی", material: "گلاسه ۳۰۰", colors: "چهاررنگ", finishing: "سلفون مات", needsDesign: false, file: "cover.pdf" });
+  await approveOrder(s.labafi, d7.id, { steps: DIGITAL_FULL });
+  await setOrderPrice(s.abdali, d7.id, { amount: 2_400_000, discount: 0 });
+  await approveArt(d7.id, s.labafi);
+  await run(d7.id, s.azad, ["D_SHEET"]);
+  await completeStep(s.azad, await step(d7.id, "D_PAPER"), { materialId: paper("P-GL300-SRA3"), quantity: 5 });
+  await run(d7.id, s.azad, ["D_PRINT", "D_CUT", "D_LAMINATION"]);
+  await decideQuality(s.labafi, await step(d7.id, "D_QUALITY"), { approve: true });
+  await run(d7.id, s.labafi, ["D_PACKAGING"]);
+  await payCash(d7.id, 2_640_000);
+
+  const d8 = await order(nazanin, { productionType: "DIGITAL", title: "عکس‌های چاپی آلبوم", quantity: 60, dimensions: "۱۳×۱۸", material: "فتو گلاسه", colors: "چهاررنگ", needsDesign: false, file: "photos.zip.pdf" });
+  await approveOrder(s.labafi, d8.id, { steps: ["D_PRINT", "D_CUT", "D_PACKAGING"], price: { amount: 3_000_000 } });
+  await approveArt(d8.id, s.labafi);
+  await run(d8.id, s.azad, ["D_PRINT", "D_CUT"]);
+  await run(d8.id, s.labafi, ["D_PACKAGING"]);
+  await payCash(d8.id, 3_300_000);
+  await dispatchOrder(s.labafi, d8.id, { method: "POST", carrierName: "پست پیشتاز", trackingCode: "۱۲۳۴۵۶۷۸۹۰۱۲" });
+
+  const d9 = await order(reza, { productionType: "DIGITAL", title: "کارت تخفیف مشتریان", quantity: 300, dimensions: "۵×۹", material: "گلاسه ۳۰۰", colors: "چهاررنگ دو رو", finishing: "سلفون براق", needsDesign: false, file: "discount-card.pdf" });
+  await approveOrder(s.labafi, d9.id, { steps: DIGITAL_FULL });
+  await setOrderPrice(s.abdali, d9.id, { amount: 4_800_000, discount: 0 });
+  await approveArt(d9.id, s.labafi);
+  await run(d9.id, s.azad, ["D_SHEET"]);
+  await completeStep(s.azad, await step(d9.id, "D_PAPER"), { materialId: paper("P-GL300-SRA3"), quantity: 15 });
+  await run(d9.id, s.azad, ["D_PRINT", "D_CUT", "D_LAMINATION"]);
+  await decideQuality(s.labafi, await step(d9.id, "D_QUALITY"), { approve: true });
+  await run(d9.id, s.labafi, ["D_PACKAGING"]);
+  await payCash(d9.id, 5_280_000);
+  await dispatchOrder(s.labafi, d9.id, { method: "COURIER", recipientName: "رضا نیک‌پور" });
+  await markDelivered(s.labafi, d9.id, { recipientName: "رضا نیک‌پور" });
+  await issueInvoice(s.abdali, d9.id);
+
+  const d10 = await order(maryam, { productionType: "DIGITAL", title: "لوگو و کارت ویزیت آرایشگاه", quantity: 500, dimensions: "۵×۹", material: "کتان ۳۰۰", colors: "چهاررنگ", needsDesign: true });
+  await approveOrder(s.labafi, d10.id, { steps: ["D_SHEET", "D_PAPER", "D_PRINT", "D_CUT", "D_PACKAGING"] });
+  await setOrderPrice(s.abdali, d10.id, { amount: 7_500_000, discount: 0 });
+  await startDesign(s.memarian, d10.id);
+
+  // ── Offset ─────────────────────────────────────────────────────────────────
+  const OFFSET_STD = ["O_LITHO", "O_PAPER", "O_PRINT", "O_CUT", "O_PACKAGING", "O_SHIPPING"];
+  const o1 = await order(ali, { productionType: "OFFSET", title: "کتاب «باغ‌های ایرانی» — ۲۰۰۰ نسخه", quantity: 2000, dimensions: "وزیری، ۲۴۰ صفحه", material: "تحریر ۷۰ و جلد گلاسه ۳۰۰", colors: "متن تک‌رنگ، جلد چهاررنگ", finishing: "سلفون مات جلد، صحافی ته‌چسب", needsDesign: false, file: "book.pdf", requestedDeadline: new Date(Date.now() + 14 * 86_400_000) });
+
+  const o2 = await order(hamid, { productionType: "OFFSET", title: "بروشور سه‌لت معرفی محصولات", quantity: 10_000, dimensions: "A4 سه‌لت", material: "گلاسه ۱۳۵", colors: "چهاررنگ دو رو", finishing: "برش و تا", needsDesign: false, file: "brochure.pdf" });
+  await approveOrder(s.gholipour, o2.id, { steps: OFFSET_STD });
+  await setOrderPrice(s.abdali, o2.id, { amount: 98_000_000, discount: 3_000_000 });
+  await addSupplierQuote(s.gholipour, o2.id, { supplierId: sup("paper-pars"), price: 48_000_000, notes: "۱۲۰ بند، تحویل امروز" });
+  await addSupplierQuote(s.gholipour, o2.id, { supplierId: sup("paper-arya"), price: 51_500_000 });
+  await addSupplierQuote(s.gholipour, o2.id, { supplierId: sup("paper-sepid"), price: 46_800_000, notes: "تحویل فردا صبح" });
+
+  const o3 = await order(reza, { productionType: "OFFSET", title: "ساک دستی کاغذی", quantity: 3000, dimensions: "۲۵×۳۵×۱۰", material: "مقوا ۲۵۰", colors: "دو رنگ", finishing: "سلفون مات، قالب و چسب", needsDesign: false, file: "bag.pdf" });
+  await approveOrder(s.hamed, o3.id, { steps: ["O_LITHO", "O_PAPER", "O_PRINT", "O_CUT", "O_LAMINATION", "O_PACKAGING"], price: { amount: 135_000_000 } });
+  await approveArt(o3.id, s.gholipour);
+  const q3 = await addSupplierQuote(s.gholipour, o3.id, { supplierId: sup("paper-pars"), price: 62_000_000 });
+  await addSupplierQuote(s.gholipour, o3.id, { supplierId: sup("paper-sepid"), price: 64_500_000 });
+  await decidePaperSupplier(s.hamed, o3.id, { quoteId: q3.id, notes: "خرید از پارس" });
+  await saveLithoJob(s.gholipour, o3.id, { supplierId: sup("litho-novin"), status: "IN_PROGRESS", price: 9_000_000, expectedAt: new Date(Date.now() + 86_400_000) });
+  await payCash(o3.id, 70_000_000);
+
+  const offsetToPress = async (id: string, opts: { litho?: string; paper?: string; price: number } = { price: 0 }) => {
+    await approveArt(id, s.gholipour);
+    const q = await addSupplierQuote(s.gholipour, id, { supplierId: sup(opts.paper ?? "paper-pars"), price: opts.price });
+    await decidePaperSupplier(s.hamed, id, { quoteId: q.id });
+    await markPaperReceived(s.gholipour, id, { note: "کاغذ رسید" });
+    await saveLithoJob(s.gholipour, id, { supplierId: sup(opts.litho ?? "litho-novin"), status: "ORDERED", price: 6_000_000 });
+    await saveLithoJob(s.gholipour, id, { supplierId: sup(opts.litho ?? "litho-novin"), status: "RECEIVED" });
   };
 
-  const run = async (ctx: Ctx, taskId: string | undefined, machine?: string, consumption?: { requirementId: string; consumed: number; wasted: number }[]) => {
-    if (!taskId) return;
-    // Seeding compresses time: waits such as ink drying are overridden by the manager.
-    const [task] = await db.select().from(t.productionTasks).where(eq(t.productionTasks.id, taskId));
-    const actor = task?.earliestStartAt && task.earliestStartAt > new Date() ? mgr : ctx;
-    await startTask(actor, taskId, { machineId: machine ? ref.machines.get(machine) : undefined, force: true });
-    await completeTask(actor, taskId, { consumption });
-  };
-  const issuePaper = async (itemId: string) => {
-    const reqs = await db.select().from(t.materialRequirements).where(eq(t.materialRequirements.orderItemId, itemId));
-    for (const r of reqs) if (r.quantityReserved > 0) await issueRequirement(wh, r.id, r.quantityReserved);
-    return reqs;
-  };
-  const finishFlow = async (orderId: string, itemId: string, method: "OFFSET" | "DIGITAL") => {
-    let ts = await tasks(orderId);
-    const reqs = await issuePaper(itemId);
-    const paperReqs = reqs.filter((r) => r.purpose === "PAPER" && r.quantityReserved > 0);
-    await run(prepress, ts.get("PREPRESS")?.id);
-    if (method === "OFFSET") {
-      ts = await tasks(orderId);
-      await run(prepress, ts.get("PLATE_MAKING")?.id, "CTP-01");
-      await run(cutter, ts.get("PAPER_CUTTING")?.id, "GUI-01");
-      ts = await tasks(orderId);
-      await run(offsetOp, ts.get("PRINTING")?.id, "OFF-01", paperReqs.map((r) => ({ requirementId: r.id, consumed: Math.floor(r.quantityReserved * 0.97), wasted: r.quantityReserved - Math.floor(r.quantityReserved * 0.97) })));
-      ts = await tasks(orderId);
-      await recordInspection(qc, ts.get("PRINT_QC")!.id, { result: "PASSED", quantityChecked: 50, quantityRejected: 0, checklist: [], defects: [] });
-    } else {
-      ts = await tasks(orderId);
-      await run(digitalOp, ts.get("PRINTING")?.id, "DIG-02", paperReqs.map((r) => ({ requirementId: r.id, consumed: r.quantityReserved - 3, wasted: 3 })));
-    }
-    for (const [key, ctx, machine] of [
-      ["LAMINATION", cutter, "LAM-01"],
-      ["CUTTING", cutter, "GUI-01"],
-      ["UV", cutter, "UV-01"],
-      ["PLOTTER", digitalOp, "PLT-01"],
-      ["CORNERS", cutter, undefined],
-      ["BINDING", binder, "BND-01"],
-    ] as const) {
-      ts = await tasks(orderId);
-      const task = ts.get(key);
-      if (task && task.status === "READY") await run(ctx, task.id, machine);
-    }
-    ts = await tasks(orderId);
-    await recordInspection(qc, ts.get("FINAL_QC")!.id, { result: "PASSED", quantityChecked: 100, quantityRejected: 0, checklist: [], defects: [] });
-    ts = await tasks(orderId);
-    await run(binder, ts.get("PACKAGING")?.id);
-  };
+  const o4 = await order(sara, { productionType: "OFFSET", title: "تراکت تبلیغاتی آموزشگاه", quantity: 20_000, dimensions: "A5", material: "تحریر ۸۰", colors: "چهاررنگ یک رو", needsDesign: false, file: "flyer.pdf" });
+  await approveOrder(s.gholipour, o4.id, { steps: OFFSET_STD, price: { amount: 42_000_000 } });
+  await offsetToPress(o4.id, { price: 18_000_000 });
+  await assignMachine(s.hajghasemi, await step(o4.id, "O_PRINT"), press("OFF-4C"));
+  await setPriority(s.gholipour, o4.id, { isPriority: true, reason: "مشتری هزینه فوری پرداخت کرد", charge: 4_000_000 });
 
-  // ── Historical completed orders (backdated) for reports ───────────────────
-  const history: [number, string, number, Selections][] = [
-    [0, "business-card", 500, { lamination: "matte" }],
-    [1, "flyer", 3000, { size: "a5", sides: "4-4" }],
-    [2, "notebook", 150, { pages: 80 }],
-    [3, "sticker", 1000, { finish: "gloss" }],
-    [4, "business-card", 1000, { paper: "kt300", corners: true }],
-    [5, "letterhead", 2000, {}],
-    [1, "sticker", 500, {}],
-    [2, "flyer", 1000, { size: "a4" }],
-    [5, "catalog", 300, { pages: 16 }],
+  const o5 = await order(nazanin, { productionType: "OFFSET", title: "سربرگ و پاکت اداری", quantity: 5000, dimensions: "A4 و پاکت ملخی", material: "تحریر ۸۰", colors: "دو رنگ", needsDesign: false, file: "letterhead.pdf" });
+  await approveOrder(s.abdali, o5.id, { steps: OFFSET_STD, price: { amount: 28_000_000 } });
+  await offsetToPress(o5.id, { paper: "paper-arya", litho: "litho-ziba", price: 9_500_000 });
+
+  const o6 = await order(hamid, { productionType: "OFFSET", title: "کارتن بسته‌بندی محصول", quantity: 8000, dimensions: "۲۰×۱۵×۸", material: "مقوا پشت‌طوسی ۴۵۰", colors: "چهاررنگ", finishing: "سلفون براق و قالب", needsDesign: false, file: "box.pdf" });
+  await approveOrder(s.gholipour, o6.id, { steps: [...OFFSET_STD, "O_LAMINATION"], price: { amount: 210_000_000 } });
+  await offsetToPress(o6.id, { price: 85_000_000 });
+  await assignMachine(s.gholipour, await step(o6.id, "O_PRINT"), press("OFF-8C"));
+  await startStep(s.hajghasemi, await step(o6.id, "O_PRINT"));
+  await payCash(o6.id, 105_000_000);
+
+  const o7 = await order(ali, { productionType: "OFFSET", title: "پوستر فیلم سینمایی", quantity: 3000, dimensions: "۵۰×۷۰", material: "گلاسه ۱۷۰", colors: "چهاررنگ", needsDesign: false, file: "film-poster.pdf" });
+  await approveOrder(s.gholipour, o7.id, { steps: ["O_LITHO", "O_PAPER", "O_PRINT", "O_CUT", "O_PACKAGING"], price: { amount: 64_000_000 } });
+  await offsetToPress(o7.id, { price: 21_000_000 });
+  await assignMachine(s.hajghasemi, await step(o7.id, "O_PRINT"), press("OFF-4C"));
+  await run(o7.id, s.hajghasemi, ["O_PRINT"]);
+
+  const o8 = await order(reza, { productionType: "OFFSET", title: "زیرلیوانی کاغذی کافه", quantity: 10_000, dimensions: "دایره ۹ سانتی‌متر", material: "مقوا ۳۰۰", colors: "تک‌رنگ", finishing: "قالب‌زنی", needsDesign: false, file: "coaster.pdf" });
+  await approveOrder(s.gholipour, o8.id, { steps: ["O_LITHO", "O_PAPER", "O_PRINT", "O_CUT", "O_PACKAGING"], price: { amount: 36_000_000 } });
+  await offsetToPress(o8.id, { price: 12_000_000 });
+  await assignMachine(s.hajghasemi, await step(o8.id, "O_PRINT"), press("OFF-1C"));
+  await run(o8.id, s.hajghasemi, ["O_PRINT"]);
+  await decideQuality(s.hamed, await step(o8.id, "O_PRINT_QUALITY"), { approve: true, notes: "رنگ یکدست" });
+
+  const o9 = await order(sara, { productionType: "OFFSET", title: "دفترچه یادداشت تبلیغاتی", quantity: 1000, dimensions: "A5، ۸۰ برگ", material: "تحریر ۷۰ و جلد ۳۰۰", colors: "جلد چهاررنگ", finishing: "سلفون، صحافی سیمی", needsDesign: false, file: "notebook.pdf" });
+  await approveOrder(s.hamed, o9.id, { steps: [...OFFSET_STD, "O_LAMINATION", "O_BINDING"], price: { amount: 88_000_000 } });
+  await offsetToPress(o9.id, { price: 30_000_000 });
+  await assignMachine(s.hajghasemi, await step(o9.id, "O_PRINT"), press("OFF-4C"));
+  await run(o9.id, s.hajghasemi, ["O_PRINT"]);
+  await decideQuality(s.hamed, await step(o9.id, "O_PRINT_QUALITY"), { approve: true });
+  await run(o9.id, s.gholipour, ["O_CUT"]);
+  await run(o9.id, s.hajghasemi, ["O_LAMINATION", "O_BINDING"]);
+  await payCash(o9.id, 50_000_000);
+
+  const o10 = await order(ali, { productionType: "OFFSET", title: "کارت پستال مجموعه‌ای", quantity: 4000, dimensions: "A6", material: "گلاسه ۳۰۰", colors: "چهاررنگ دو رو", finishing: "سلفون مات", needsDesign: false, file: "postcards.pdf" });
+  await approveOrder(s.gholipour, o10.id, { steps: [...OFFSET_STD, "O_LAMINATION"], price: { amount: 52_000_000 } });
+  await offsetToPress(o10.id, { price: 16_000_000 });
+  await assignMachine(s.hajghasemi, await step(o10.id, "O_PRINT"), press("OFF-4C"));
+  await run(o10.id, s.hajghasemi, ["O_PRINT"]);
+  await decideQuality(s.hamed, await step(o10.id, "O_PRINT_QUALITY"), { approve: true });
+  await run(o10.id, s.gholipour, ["O_CUT"]);
+  await run(o10.id, s.hajghasemi, ["O_LAMINATION"]);
+  await decideQuality(s.hamed, await step(o10.id, "O_FINAL_QUALITY"), { approve: true });
+  await run(o10.id, s.hajghasemi, ["O_PACKAGING"]);
+  await payCash(o10.id, 57_200_000);
+
+  const o11 = await order(hamid, { productionType: "OFFSET", title: "کاتالوگ سالانه شرکت", quantity: 1500, dimensions: "A4، ۴۸ صفحه", material: "گلاسه ۱۳۵ و جلد ۳۰۰", colors: "چهاررنگ", finishing: "سلفون جلد، منگنه", needsDesign: false, file: "annual-catalog.pdf" });
+  await approveOrder(s.hamed, o11.id, { steps: [...OFFSET_STD, "O_BINDING"], price: { amount: 145_000_000 } });
+  await offsetToPress(o11.id, { price: 58_000_000 });
+  await assignMachine(s.hajghasemi, await step(o11.id, "O_PRINT"), press("OFF-4C"));
+  await run(o11.id, s.hajghasemi, ["O_PRINT"]);
+  await decideQuality(s.hamed, await step(o11.id, "O_PRINT_QUALITY"), { approve: true });
+  await run(o11.id, s.gholipour, ["O_CUT"]);
+  await run(o11.id, s.hajghasemi, ["O_BINDING"]);
+  await decideQuality(s.hamed, await step(o11.id, "O_FINAL_QUALITY"), { approve: true });
+  await run(o11.id, s.hajghasemi, ["O_PACKAGING"]);
+  await payCash(o11.id, 159_500_000);
+  await dispatchOrder(s.hajghasemi, o11.id, { method: "EXTERNAL", carrierName: "باربری ایران‌پیما", trackingCode: "BRN-44821" });
+  await markDelivered(s.gholipour, o11.id, { recipientName: "انبار شرکت پخش البرز" });
+  await issueInvoice(s.abdali, o11.id);
+
+  const o12 = await order(maryam, { productionType: "OFFSET", title: "کارت عروسی", quantity: 400, dimensions: "۱۲×۱۷", material: "کتان ۳۰۰", colors: "چهاررنگ و طلاکوب", needsDesign: true });
+  await approveOrder(s.gholipour, o12.id, { steps: OFFSET_STD, price: { amount: 18_000_000 } });
+
+  // ── A store purchase paid online, waiting for approval ─────────────────────
+  const cart = await getOrCreateCart(nazanin.ctx);
+  await addCartItem(nazanin.ctx, cart, { productId: ref.products.get("business-card")!, quantity: 500, selections: { lamination: "matte" }, urgency: "STANDARD" });
+  const view = await cartView(nazanin.ctx, cart);
+  const total = view.subtotal + Math.round(view.subtotal * view.vatPct / 100);
+  const store = await checkout(nazanin.ctx, { deliveryMethodId: ref.deliveryMethods.get("PICKUP")!, expectedTotal: total, idempotencyKey: "seed-store" });
+  const pay = await startOnlinePayment(nazanin.ctx, store.orders[0]!.id, { idempotencyKey: "seed-store" });
+  const authority = new URL(pay.redirectUrl).searchParams.get("authority")!;
+  await handlePaymentCallback("fake", new URLSearchParams({ pid: pay.paymentId, Authority: authority, Status: "OK" }));
+
+  // ── Make it look like a working week: older orders further back in time ──
+  const ages: [string, number][] = [
+    [o11.id, 240], [d9.id, 200], [o10.id, 150], [o9.id, 130], [o6.id, 110], [o8.id, 96], [o7.id, 90], [d6.id, 80], [o5.id, 72], [d7.id, 70], [o4.id, 60],
+    [d8.id, 54], [o3.id, 50], [d4.id, 30], [d5.id, 26], [o2.id, 22], [d10.id, 20], [o12.id, 18], [d3.id, 12], [o1.id, 6], [d1.id, 4], [d2.id, 2], [store.orders[0]!.id, 1],
   ];
-  for (const [i, [ci, slug, qty, sel]] of history.entries()) {
-    const o = await order(ci, slug, qty, sel, { delivery: i % 3 === 0 ? pickup : courier });
-    await confirmOrder(sales, o.id);
-    await uploadAndApprove(ci, o.itemId);
-    await pay(o.id, o.total, i % 2 ? "POS" : "BANK_TRANSFER", `hist-${i}`);
-    const [item] = await db.select().from(t.orderItems).where(eq(t.orderItems.id, o.itemId));
-    await finishFlow(o.id, o.itemId, item!.productionMethod as "OFFSET" | "DIGITAL");
-    const s = await createShipment(shipper, o.id, { methodId: i % 3 === 0 ? pickup : courier, assigneeId: ref.employees.get("E012")!.employeeId });
-    if (i % 3 !== 0) await dispatchShipment(shipper, s.id);
-    await completeShipment(shipper, s.id, { recipientName: DEMO_CUSTOMERS[ci]!.fullName });
-    const daysAgo = 3 + i * 3;
-    const shift = sql`make_interval(days => ${daysAgo})`;
-    await db.execute(sql`UPDATE orders SET placed_at = placed_at - ${shift}, confirmed_at = confirmed_at - ${shift}, ready_at = ready_at - ${shift}, completed_at = completed_at - ${shift} + interval '2 days', created_at = created_at - ${shift}, due_date = due_date - ${shift} + interval '2 days' WHERE id = ${o.id}`);
-    await db.execute(sql`UPDATE payments SET confirmed_at = confirmed_at - ${shift} + interval '1 day', created_at = created_at - ${shift} WHERE order_id = ${o.id}`);
-    await db.execute(sql`UPDATE production_tasks SET started_at = started_at - ${shift}, completed_at = completed_at - ${shift}, ready_at = ready_at - ${shift} WHERE order_id = ${o.id}`);
-    await db.execute(sql`UPDATE order_events SET created_at = created_at - ${shift} WHERE order_id = ${o.id}`);
-    await db.execute(sql`UPDATE qc_inspections SET created_at = created_at - ${shift} WHERE job_id IN (SELECT id FROM production_jobs WHERE order_id = ${o.id})`);
-    await respaceHistory(o.id, i);
-  }
-
-  // ── Live orders in every interesting state ────────────────────────────────
-
-  // A. The notebook scenario: 300 notebooks, design service, paper shortage → procurement in parallel
-  const a = await order(2, "notebook", 400, { pages: 120, inner_paper: "th70", binding: "wire", cover_lamination: "matte", design: "service" }, { priority: "HIGH" });
-  await confirmOrder(sales, a.id);
-  await pay(a.id, Math.ceil(a.total / 2), "BANK_TRANSFER", "a-dep");
-  const aTasks = await tasks(a.id);
-  await startTask(designer, aTasks.get("DESIGN")!.id);
-  await pauseTask(designer, aTasks.get("DESIGN")!.id, "در انتظار ارسال لوگوی باکیفیت از مشتری");
-  // Procurement orders the missing paper
-  const shortages = await db.select().from(t.materialRequests).where(and(eq(t.materialRequests.orderId, a.id), eq(t.materialRequests.status, "OPEN")));
-  if (shortages.length) {
-    const byMaterial = new Map<string, typeof shortages>();
-    for (const s of shortages) byMaterial.set(s.materialId, [...(byMaterial.get(s.materialId) ?? []), s]);
-    for (const [materialId, reqs] of byMaterial) {
-      const [m] = await db.select().from(t.materials).where(eq(t.materials.id, materialId));
-      await createPurchaseOrder(wh.actor.kind === "staff" && wh.actor.permissions.has("procurement.manage") ? wh : mgr, {
-        supplierId: m!.defaultSupplierId!,
-        submit: true,
-        expectedAt: new Date(Date.now() + 2 * 86_400_000),
-        lines: [{ materialId, quantity: Math.max(m!.reorderQuantity, Math.ceil(reqs.reduce((s, r) => s + r.quantity, 0))), unitCost: m!.standardCost, materialRequestIds: reqs.map((r) => r.id) }],
-      });
-    }
-  }
-
-  // B. Business cards, paid in full, printing in progress on the digital press
-  const b = await order(0, "business-card", 1000, { sides: "4-4", lamination: "matte", spot_uv: true }, { priority: "URGENT" });
-  await confirmOrder(sales, b.id);
-  await uploadAndApprove(0, b.itemId);
-  await pay(b.id, b.total, "POS", "b-full");
-  await issuePaper(b.itemId);
-  let bt = await tasks(b.id);
-  await run(prepress, bt.get("PREPRESS")!.id);
-
-  // C. Offset flyers: printed, print-QC rejected once (rework), now in finishing
-  const c = await order(1, "flyer", 5000, { size: "a4", sides: "4-4" }, { priority: "NORMAL" });
-  await confirmOrder(sales, c.id);
-  await uploadAndApprove(1, c.itemId);
-  await pay(c.id, Math.ceil(c.total * 0.6), "BANK_TRANSFER", "c-dep");
-  const cReqs = await issuePaper(c.itemId);
-  let ct = await tasks(c.id);
-  await run(prepress, ct.get("PREPRESS")!.id);
-  ct = await tasks(c.id);
-  await run(prepress, ct.get("PLATE_MAKING")!.id, "CTP-01");
-  await run(cutter, ct.get("PAPER_CUTTING")!.id, "GUI-01");
-  ct = await tasks(c.id);
-  const paper = cReqs.filter((r) => r.purpose === "PAPER");
-  await run(offsetOp, ct.get("PRINTING")!.id, "OFF-01", paper.map((r) => ({ requirementId: r.id, consumed: Math.floor(r.quantityRequired * 0.8), wasted: Math.floor(r.quantityRequired * 0.03) })));
-  ct = await tasks(c.id);
-  await recordInspection(qc, ct.get("PRINT_QC")!.id, {
-    result: "FAILED",
-    quantityChecked: 200,
-    quantityRejected: 60,
-    checklist: [{ item: "تطابق رنگ با پروف تأییدشده", passed: false }],
-    defects: [{ defectCode: "COLOR", severity: "MAJOR", quantity: 60, description: "سایان کم‌رنگ" }],
-    reworkTargetStepKey: "PRINTING",
-    reworkQuantity: 1000,
-    notes: "اختلاف رنگ در فرم دوم",
-  });
-  ct = await tasks(c.id);
-  await run(offsetOp, ct.get("PRINTING")!.id, "OFF-01", paper.map((r) => ({ requirementId: r.id, consumed: Math.max(0, Math.floor(r.quantityRequired * 0.15)), wasted: 5 })));
-  ct = await tasks(c.id);
-  await recordInspection(qc, ct.get("PRINT_QC")!.id, { result: "PASSED", quantityChecked: 200, quantityRejected: 0, checklist: [], defects: [] });
-
-  // D. Catalog: waiting for the customer's file (pending review)
-  const d = await order(5, "catalog", 250, { pages: 24, binding: "perfect" });
-  void d;
-
-  // E. Stickers: ready for pickup, half paid
-  const e = await order(3, "sticker", 500, { size: "s70", finish: "gloss" }, { delivery: pickup });
-  await confirmOrder(sales, e.id);
-  await uploadAndApprove(3, e.itemId);
-  await pay(e.id, Math.ceil(e.total / 2), "CASH", "e-dep");
-  await finishFlow(e.id, e.itemId, "DIGITAL");
-
-  // F. Letterheads: out for delivery
-  const f = await order(4, "letterhead", 1000, {}, { priority: "LOW" });
-  await confirmOrder(sales, f.id);
-  await uploadAndApprove(4, f.itemId);
-  await pay(f.id, f.total, "BANK_TRANSFER", "f-full");
-  const [fItem] = await db.select().from(t.orderItems).where(eq(t.orderItems.id, f.itemId));
-  await finishFlow(f.id, f.itemId, fItem!.productionMethod as "OFFSET" | "DIGITAL");
-  const fs = await createShipment(shipper, f.id, { methodId: courier, assigneeId: ref.employees.get("E012")!.employeeId, vehicleId: null });
-  await dispatchShipment(shipper, fs.id);
-
-  // G. Flyers with a proof waiting for the customer, and a blocked job
-  const g = await order(0, "flyer", 800, { size: "a5", design: "service" });
-  await confirmOrder(sales, g.id);
-  const gt = await tasks(g.id);
-  await startTask(designer, gt.get("DESIGN")!.id);
-  const gf = await storeUpload(designer, { data: PDF, filename: "flyer-proof.pdf", purpose: "ARTWORK" });
-  const gv = await addArtworkVersion(designer, g.itemId, { fileId: gf.id, stage: "DESIGNER", note: "نسخه اول طرح" });
-  await sendProof(designer, gv.id, "لطفاً رنگ‌ها و متن را بررسی کنید");
-
-  const h = await order(1, "business-card", 2000, { paper: "kt300", lamination: "gloss" });
-  await confirmOrder(sales, h.id);
-  await uploadAndApprove(1, h.itemId);
-  await pay(h.id, h.total, "POS", "h-full");
-  const hTasks = await tasks(h.id);
-  await startTask(prepress, hTasks.get("PREPRESS")!.id);
-  await reportIssue(prepress, hTasks.get("PREPRESS")!.id, { type: "FILE_PROBLEM", description: "فونت‌های فایل تبدیل به منحنی نشده‌اند", block: true });
-
-  // B is on the press right now (started last: an operator runs one job at a time)
-  bt = await tasks(b.id);
-  await startTask(digitalOp, bt.get("PRINTING")!.id, { machineId: ref.machines.get("DIG-01") });
-
-  // Web order waiting for payment
-  await order(4, "sticker", 250, {}, { delivery: pickup });
-
-  // Quotes & inquiries
-  const inquiry = await createInquiry(customers[5]!.ctx, { title: "جعبه بسته‌بندی محصول", description: "۱۰۰۰ عدد جعبه مقوایی با چاپ چهاررنگ و قالب‌برش برای محصولات الکترونیکی", quantity: 1000 });
-  void inquiry;
-  const q = await createQuote(sales, {
-    customerId: customers[2]!.id,
-    items: [
-      { productId: ref.products.get("catalog")!, quantity: 500, selections: { pages: 32 } },
-      { title: "طراحی و صفحه‌آرایی کاتالوگ", quantity: 1, lineSubtotal: 45_000_000 },
-    ],
-    customerNote: "قیمت شامل طراحی کامل کاتالوگ است.",
-  });
-  await sendQuote(sales, q.id);
-
-  // Maintenance on the second offset press
-  await scheduleMaintenance(mgr, { machineId: ref.machines.get("OFF-02")!, kind: "PREVENTIVE", title: "سرویس دوره‌ای غلتک‌ها", scheduledStart: new Date(Date.now() + 86_400_000), scheduledEnd: new Date(Date.now() + 86_400_000 + 4 * 3_600_000) });
-
-  return { customers: customers.length };
+  for (const [id, hours] of ages) await ageOrder(db, id, hours);
+  // One order past its requested date, so the manager sees the alert.
+  await db.update(t.orders).set({ requestedDeadline: new Date(Date.now() - 86_400_000) }).where(eq(t.orders.id, o9.id));
 }
+
+/** Moves an order's history back in time, keeping its internal sequence. */
+async function ageOrder(db: Database, orderId: string, hours: number) {
+  const shift = sql`make_interval(hours => ${hours})`;
+  const id = sql`${orderId}::uuid`;
+  await db.execute(sql`UPDATE orders SET created_at = created_at - ${shift}, approved_at = approved_at - ${shift}, priced_at = priced_at - ${shift}, ready_at = ready_at - ${shift}, shipped_at = shipped_at - ${shift}, delivered_at = delivered_at - ${shift}, priority_set_at = priority_set_at - ${shift} WHERE id = ${id}`);
+  // Later events get proportionally less of the shift, so time flows forward.
+  for (const table of ["order_events", "order_approvals", "artwork_files", "supplier_quotes", "quality_approvals", "priority_changes"]) {
+    await db.execute(sql`UPDATE ${sql.identifier(table)} SET created_at = created_at - ${shift} * 0.9 WHERE order_id = ${id}`);
+  }
+  await db.execute(sql`UPDATE production_steps SET ready_at = ready_at - ${shift} * 0.8, started_at = started_at - ${shift} * 0.7, completed_at = completed_at - ${shift} * 0.6 WHERE order_id = ${id}`);
+  await db.execute(sql`UPDATE payments SET created_at = created_at - ${shift} * 0.5, confirmed_at = confirmed_at - ${shift} * 0.5 WHERE order_id = ${id}`);
+  await db.execute(sql`UPDATE shipments SET dispatched_at = dispatched_at - ${shift} * 0.3, delivered_at = delivered_at - ${shift} * 0.2 WHERE order_id = ${id}`);
+  await db.execute(sql`UPDATE invoices SET issued_at = issued_at - ${shift} * 0.2 WHERE order_id = ${id}`);
+  await db.execute(sql`UPDATE lithography_jobs SET sent_at = sent_at - ${shift} * 0.7, received_at = received_at - ${shift} * 0.6 WHERE order_id = ${id}`);
+}
+

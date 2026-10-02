@@ -1,105 +1,93 @@
-import { and, desc, eq, gte, inArray, ne, sql } from "drizzle-orm";
-import { customers, orders, payments, users } from "@/server/db/schema";
-import { type Ctx, assertCan } from "@/server/core/context";
+import { and, desc, eq, ilike, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { customers, invoices, orders, payments, users } from "@/server/db/schema";
+import { type Ctx, assertCan, assertCanAny } from "@/server/core/context";
+import { CUSTOMER_CODE_RE } from "@/lib/order-status";
+import { normalizeFa, toEnDigits } from "@/lib/persian";
 
 const balanceSql = sql<number>`(${orders.total} - (${orders.paidAmount} - ${orders.refundedAmount}))::float`;
 
-/**
- * Orders with an outstanding balance. Orders that are ready for handover come
- * first because the balance usually blocks release of the goods.
- */
-export async function receivables(ctx: Ctx) {
-  assertCan(ctx, "payment.view");
+export type AccountingFilter = "open" | "unpaid" | "unpriced" | "all";
+
+/** Projects/orders with their money: amount, paid, remaining, invoices. */
+export async function accountingOrders(ctx: Ctx, f: { filter?: AccountingFilter; q?: string; limit?: number } = {}) {
+  assertCanAny(ctx, "payment.view", "invoice.manage");
+  const conds: SQL[] = [];
+  const filter = f.filter ?? "open";
+  if (filter !== "all") conds.push(notInArray(orders.status, ["REJECTED", "CANCELLED"]));
+  if (filter === "open") conds.push(or(sql`${balanceSql} > 0`, isNull(orders.pricedAt))!);
+  if (filter === "unpaid") conds.push(sql`${balanceSql} > 0`, sql`${orders.pricedAt} IS NOT NULL`);
+  if (filter === "unpriced") conds.push(isNull(orders.pricedAt), eq(orders.kind, "CUSTOM"), notInArray(orders.status, ["WAITING_APPROVAL", "NEEDS_INFO"]));
+  const q = f.q ? toEnDigits(normalizeFa(f.q.trim())) : "";
+  if (q) {
+    const code = CUSTOMER_CODE_RE.exec(q);
+    conds.push(or(ilike(orders.code, `%${q}%`), ilike(customers.fullName, `%${q}%`), ilike(customers.companyName, `%${q}%`), code ? eq(customers.code, Number(code[1])) : sql`false`)!);
+  }
   return ctx.db
     .select({
       id: orders.id,
-      number: orders.number,
+      code: orders.code,
+      title: orders.title,
+      kind: orders.kind,
+      productionType: orders.productionType,
       status: orders.status,
       paymentStatus: orders.paymentStatus,
-      deliveryStatus: orders.deliveryStatus,
       total: orders.total,
+      pricedAt: orders.pricedAt,
       paid: sql<number>`(${orders.paidAmount} - ${orders.refundedAmount})::float`,
       balance: balanceSql,
-      placedAt: orders.placedAt,
-      readyAt: orders.readyAt,
-      dueDate: orders.dueDate,
+      createdAt: orders.createdAt,
       customerId: customers.id,
+      customerCode: customers.code,
       customerName: customers.fullName,
       companyName: customers.companyName,
-      customerPhone: customers.phone,
-      creditLimit: customers.creditLimit,
-      pendingApproval: sql<number>`coalesce((select sum(p.amount) from payments p where p.order_id = ${orders.id} and p.kind = 'PAYMENT' and p.status = 'AWAITING_APPROVAL'), 0)::float`,
+      customerType: customers.type,
+      invoiceCount: sql<number>`(select count(*)::int from invoices i where i.order_id = ${orders.id} and i.status = 'ISSUED')`,
     })
     .from(orders)
     .innerJoin(customers, eq(customers.id, orders.customerId))
-    .where(and(ne(orders.status, "CANCELLED"), ne(orders.status, "PENDING_REVIEW"), sql`${balanceSql} > 0`))
-    .orderBy(sql`case when ${orders.status} = 'READY' then 0 when ${orders.status} = 'COMPLETED' then 1 else 2 end`, orders.placedAt);
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(sql`case when ${orders.status} in ('READY','SHIPPING','DELIVERED') then 0 else 1 end`, desc(orders.createdAt))
+    .limit(f.limit ?? 200);
 }
 
-/** Orders where the customer paid more than the (possibly cancelled) order is worth. */
-export async function refundsDue(ctx: Ctx) {
+export async function paymentLedger(ctx: Ctx, f: { status?: string[]; limit?: number } = {}) {
   assertCan(ctx, "payment.view");
-  const effectiveTotal = sql<number>`(case when ${orders.status} = 'CANCELLED' then 0 else ${orders.total} end)`;
   return ctx.db
-    .select({
-      id: orders.id,
-      number: orders.number,
-      status: orders.status,
-      total: orders.total,
-      paid: sql<number>`(${orders.paidAmount} - ${orders.refundedAmount})::float`,
-      excess: sql<number>`((${orders.paidAmount} - ${orders.refundedAmount}) - ${effectiveTotal})::float`,
-      customerName: customers.fullName,
-    })
-    .from(orders)
-    .innerJoin(customers, eq(customers.id, orders.customerId))
-    .where(sql`(${orders.paidAmount} - ${orders.refundedAmount}) > ${effectiveTotal}`)
-    .orderBy(desc(orders.updatedAt));
-}
-
-export async function paymentLedger(ctx: Ctx, f: { status?: string[]; method?: string; since?: Date; limit?: number } = {}) {
-  assertCan(ctx, "payment.view");
-  const conds = [ne(payments.status, "PENDING")];
-  if (f.status?.length) conds.push(inArray(payments.status, f.status as never));
-  if (f.method) conds.push(eq(payments.method, f.method as never));
-  if (f.since) conds.push(gte(payments.createdAt, f.since));
-  return ctx.db
-    .select({ payment: payments, orderNumber: orders.number, customerName: customers.fullName, createdBy: users.fullName })
+    .select({ payment: payments, orderCode: orders.code, orderId: orders.id, customerName: customers.fullName, createdByName: users.fullName })
     .from(payments)
     .innerJoin(orders, eq(orders.id, payments.orderId))
     .innerJoin(customers, eq(customers.id, payments.customerId))
     .leftJoin(users, eq(users.id, payments.createdBy))
-    .where(and(...conds))
+    .where(f.status?.length ? inArray(payments.status, f.status as (typeof payments.$inferSelect)["status"][]) : sql`${payments.status} <> 'PENDING'`)
     .orderBy(desc(payments.createdAt))
     .limit(f.limit ?? 100);
 }
 
-/** Headline figures for the accounting workspace (all amounts in rial). */
-export async function financeSummary(ctx: Ctx, now = new Date()) {
-  assertCan(ctx, "payment.view");
-  // Day / month boundaries in Tehran time (UTC+03:30, no DST since 1401).
-  const tehran = new Date(now.getTime() + 210 * 60_000);
-  const dayStart = new Date(Date.UTC(tehran.getUTCFullYear(), tehran.getUTCMonth(), tehran.getUTCDate()) - 210 * 60_000);
-  const last30 = new Date(now.getTime() - 30 * 86_400_000);
+export async function invoiceList(ctx: Ctx, f: { customerId?: string; orderId?: string; limit?: number } = {}) {
+  assertCanAny(ctx, "invoice.manage", "payment.view");
+  const conds: SQL[] = [];
+  if (f.customerId) conds.push(eq(invoices.customerId, f.customerId));
+  if (f.orderId) conds.push(eq(invoices.orderId, f.orderId));
+  return ctx.db
+    .select({ invoice: invoices, orderCode: orders.code, customerName: customers.fullName, customerCode: customers.code })
+    .from(invoices)
+    .innerJoin(orders, eq(orders.id, invoices.orderId))
+    .innerJoin(customers, eq(customers.id, invoices.customerId))
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(invoices.issuedAt))
+    .limit(f.limit ?? 100);
+}
+
+export async function accountingSummary(ctx: Ctx) {
+  assertCanAny(ctx, "payment.view", "invoice.manage");
   const [row] = await ctx.db
     .select({
-      today: sql<number>`coalesce(sum(case when ${payments.kind} = 'PAYMENT' and ${payments.confirmedAt} >= ${dayStart} then ${payments.amount} end), 0)::float`,
-      last30: sql<number>`coalesce(sum(case when ${payments.kind} = 'PAYMENT' and ${payments.confirmedAt} >= ${last30} then ${payments.amount} end), 0)::float`,
-      refunds30: sql<number>`coalesce(sum(case when ${payments.kind} = 'REFUND' and ${payments.confirmedAt} >= ${last30} then ${payments.amount} end), 0)::float`,
+      receivable: sql<number>`coalesce(sum(greatest(${balanceSql}, 0)) filter (where ${orders.pricedAt} is not null), 0)::float`,
+      unpaidOrders: sql<number>`count(*) filter (where ${balanceSql} > 0 and ${orders.pricedAt} is not null)::int`,
+      unpriced: sql<number>`count(*) filter (where ${orders.pricedAt} is null and ${orders.kind} = 'CUSTOM' and ${orders.status} not in ('WAITING_APPROVAL','NEEDS_INFO'))::int`,
     })
-    .from(payments)
-    .where(eq(payments.status, "CONFIRMED"));
-  const [pending] = await ctx.db
-    .select({ count: sql<number>`count(*)::int`, amount: sql<number>`coalesce(sum(${payments.amount}), 0)::float` })
-    .from(payments)
-    .where(eq(payments.status, "AWAITING_APPROVAL"));
-  const [outstanding] = await ctx.db
-    .select({ amount: sql<number>`coalesce(sum(${balanceSql}), 0)::float`, count: sql<number>`count(*)::int` })
     .from(orders)
-    .where(and(ne(orders.status, "CANCELLED"), ne(orders.status, "PENDING_REVIEW"), sql`${balanceSql} > 0`));
-  const byMethod = await ctx.db
-    .select({ method: payments.method, amount: sql<number>`sum(${payments.amount})::float` })
-    .from(payments)
-    .where(and(eq(payments.status, "CONFIRMED"), eq(payments.kind, "PAYMENT"), gte(payments.confirmedAt, last30)))
-    .groupBy(payments.method);
-  return { ...row!, pendingCount: pending!.count, pendingAmount: pending!.amount, outstanding: outstanding!.amount, outstandingCount: outstanding!.count, byMethod };
+    .where(notInArray(orders.status, ["REJECTED", "CANCELLED"]));
+  const [p] = await ctx.db.select({ n: sql<number>`count(*)::int` }).from(payments).where(eq(payments.status, "AWAITING_APPROVAL"));
+  return { ...row!, paymentsToConfirm: p!.n };
 }

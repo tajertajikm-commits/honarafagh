@@ -1,49 +1,51 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Users } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Code, DateText, EmptyState, Money } from "@/components/ui/misc";
+import { CustomerCode, DateText, EmptyState, Money } from "@/components/ui/misc";
+import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { CustomerFormButton } from "@/components/panel/customer-form";
 import { PageHeader } from "@/components/panel/page";
 import { Pagination } from "@/components/panel/pagination";
 import { SearchBox } from "@/components/panel/search-box";
-import { formatNumber, formatPercent, formatPhone } from "@/lib/persian";
 import { requireStaffPage } from "@/server/http/session";
 import { listCustomers } from "@/server/modules/people/service";
+import { CUSTOMER_TYPE } from "@/lib/labels";
+import { formatNumber, formatPhone } from "@/lib/persian";
 
 export const metadata: Metadata = { title: "مشتریان" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
-  const sp = await searchParams;
   const ctx = await requireStaffPage({ permission: "customer.view" });
-  const page = Number(sp.page ?? 1) || 1;
-  const { rows, total, pageSize } = await listCustomers(ctx, { q: sp.q, page, pageSize: 25 });
+  const sp = await searchParams;
+  const r = await listCustomers(ctx, { q: sp.q, page: Number(sp.page) || 1 });
   return (
-    <>
-      <PageHeader title="مشتریان" description={`${formatNumber(total)} مشتری`} actions={ctx.actor.permissions.has("customer.manage") && <CustomerFormButton />} />
-      <div className="mb-4 flex justify-end"><SearchBox placeholder="نام، شرکت یا موبایل" /></div>
-      <Card className="overflow-hidden">
-        {rows.length === 0 ? <EmptyState icon={<Users />} title="مشتری‌ای پیدا نشد" /> : (
+    <div className="mx-auto max-w-6xl">
+      <PageHeader title="مشتریان" description="جستجو با کد مشتری (CUS-1042)، نام، شرکت یا موبایل." />
+      <div className="mb-4"><SearchBox placeholder="CUS-1042، نام، شرکت یا موبایل…" /></div>
+      {r.rows.length === 0 ? (
+        <EmptyState title="مشتری‌ای پیدا نشد" />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
           <Table>
-            <THead><tr><TH>مشتری</TH><TH>موبایل</TH><TH className="text-end">سفارش</TH><TH className="text-end">خرید کل</TH><TH className="text-end">مانده</TH><TH>تخفیف ثابت</TH><TH>آخرین سفارش</TH></tr></THead>
+            <THead>
+              <TR><TH>کد</TH><TH>مشتری</TH><TH>نوع</TH><TH>موبایل</TH><TH className="text-end">سفارش‌ها</TH><TH className="text-end">مانده</TH><TH>آخرین سفارش</TH></TR>
+            </THead>
             <TBody>
-              {rows.map(({ c, orderCount, revenue, balance, lastOrderAt }) => (
+              {r.rows.map(({ c, orderCount, balance, lastOrderAt }) => (
                 <TR key={c.id}>
-                  <TD><Link href={`/panel/customers/${c.id}`} className="font-bold hover:text-accent-ink">{c.fullName}</Link>{c.companyName && <span className="block text-[12px] text-muted">{c.companyName}</span>}</TD>
-                  <TD><Code>{formatPhone(c.phone)}</Code></TD>
+                  <TD><Link href={`/panel/customers/CUS-${c.code}`} className="font-bold hover:underline"><CustomerCode code={c.code} /></Link></TD>
+                  <TD><Link href={`/panel/customers/CUS-${c.code}`} className="font-bold hover:underline">{c.companyName || c.fullName}</Link>{c.companyName && <span className="block text-[12px] text-muted">{c.fullName}</span>}</TD>
+                  <TD><Badge tone={c.type === "COMPANY" ? "violet" : "neutral"}>{CUSTOMER_TYPE[c.type]}</Badge></TD>
+                  <TD><bdi dir="ltr" className="text-[13px]">{formatPhone(c.phone)}</bdi></TD>
                   <TD className="text-end tabular">{formatNumber(orderCount)}</TD>
-                  <TD className="text-end"><Money rial={revenue} /></TD>
-                  <TD className={`text-end ${balance > 0 ? "text-danger" : "text-muted"}`}>{balance > 0 ? <Money rial={balance} /> : "—"}</TD>
-                  <TD className="text-muted">{c.discountPct ? formatPercent(c.discountPct) : "—"}</TD>
-                  <TD className="text-muted"><DateText value={lastOrderAt} /></TD>
+                  <TD className="text-end">{balance > 0 ? <Money rial={balance} className="text-danger" /> : "—"}</TD>
+                  <TD><DateText value={lastOrderAt} relative className="text-[12.5px] text-muted" /></TD>
                 </TR>
               ))}
             </TBody>
           </Table>
-        )}
-        <Pagination page={page} pageSize={pageSize} total={total} href={(p) => `/panel/customers?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), page: String(p) })}`} />
-      </Card>
-    </>
+        </div>
+      )}
+      <Pagination page={r.page} pageSize={r.pageSize} total={r.total} href={(p) => `/panel/customers?page=${p}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ""}`} />
+    </div>
   );
 }

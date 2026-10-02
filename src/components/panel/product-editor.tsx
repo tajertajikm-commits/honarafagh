@@ -34,7 +34,7 @@ export interface ProductDef {
   isFeatured: boolean;
   highlights: string[];
   imageUrl: string | null;
-  methods: { methodCode: string; workflowTemplateCode: string; minQuantity: number; maxQuantity: number | null }[];
+  methods: { methodCode: "DIGITAL" | "OFFSET"; minQuantity: number; maxQuantity: number | null }[];
   groups: GroupDef[];
 }
 
@@ -77,13 +77,13 @@ function move<T>(arr: T[], i: number, d: -1 | 1) {
   return out;
 }
 
-export function ProductEditor({ productId, initial, categories, ruleSets, methods, workflows }: {
+const METHODS = [{ code: "DIGITAL" as const, name: "دیجیتال" }, { code: "OFFSET" as const, name: "افست" }];
+
+export function ProductEditor({ productId, initial, categories, ruleSets }: {
   productId: string | null;
   initial: ProductDef;
   categories: { id: string; name: string }[];
   ruleSets: { id: string; name: string }[];
-  methods: { code: string; name: string }[];
-  workflows: { code: string; name: string; methodCode: string | null }[];
 }) {
   const router = useRouter();
   const { toast } = useApiAction();
@@ -144,12 +144,11 @@ export function ProductEditor({ productId, initial, categories, ruleSets, method
       </Card>
 
       <Card>
-        <CardHeader title="روش‌های تولید" description="برای هر روش، بازه تیراژ و گردش‌کار تولید. انتخاب بین روش‌ها طبق «مشخصات فنی» (ارزان‌ترین یا اولویت) انجام می‌شود." actions={<Button size="xs" variant="ghost" onClick={() => set({ methods: [...d.methods, { methodCode: methods[0]?.code ?? "", workflowTemplateCode: workflows[0]?.code ?? "", minQuantity: 1, maxQuantity: null }] })}><Plus /> روش</Button>} />
+        <CardHeader title="روش‌های تولید" description="هر روش با بازه تیراژش. سیستم مقرون‌به‌صرفه‌ترین روش را انتخاب می‌کند؛ همان روش، نوع سفارش (دیجیتال یا افست) را تعیین می‌کند." actions={<Button size="xs" variant="ghost" onClick={() => set({ methods: [...d.methods, { methodCode: "DIGITAL" as const, minQuantity: 1, maxQuantity: null }] })}><Plus /> روش</Button>} />
         <CardBody className="space-y-2 pt-0">
           {d.methods.map((m, i) => (
-            <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_1.4fr_110px_110px_32px]">
-              <Field label={i === 0 ? "روش" : undefined}><Select aria-label="روش" value={m.methodCode} onChange={(e) => set({ methods: d.methods.map((x, j) => (j === i ? { ...x, methodCode: e.target.value } : x)) })}>{methods.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</Select></Field>
-              <Field label={i === 0 ? "گردش‌کار" : undefined}><Select aria-label="گردش‌کار" value={m.workflowTemplateCode} onChange={(e) => set({ methods: d.methods.map((x, j) => (j === i ? { ...x, workflowTemplateCode: e.target.value } : x)) })}>{workflows.filter((w) => !w.methodCode || w.methodCode === m.methodCode).map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}</Select></Field>
+            <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_110px_110px_32px]">
+              <Field label={i === 0 ? "روش" : undefined}><Select aria-label="روش" value={m.methodCode} onChange={(e) => set({ methods: d.methods.map((x, j) => (j === i ? { ...x, methodCode: e.target.value as "DIGITAL" | "OFFSET" } : x)) })}>{METHODS.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</Select></Field>
               <Field label={i === 0 ? "از تیراژ" : undefined}><Input ltr aria-label="از تیراژ" inputMode="numeric" value={String(m.minQuantity)} onChange={(e) => set({ methods: d.methods.map((x, j) => (j === i ? { ...x, minQuantity: Math.max(1, int(e.target.value)) } : x)) })} /></Field>
               <Field label={i === 0 ? "تا تیراژ" : undefined}><Input ltr aria-label="تا تیراژ" inputMode="numeric" value={m.maxQuantity == null ? "" : String(m.maxQuantity)} onChange={(e) => set({ methods: d.methods.map((x, j) => (j === i ? { ...x, maxQuantity: e.target.value ? int(e.target.value) : null } : x)) })} /></Field>
               <Button size="icon-sm" variant="ghost" aria-label="حذف روش" disabled={d.methods.length === 1} onClick={() => set({ methods: d.methods.filter((_, j) => j !== i) })}><Trash2 /></Button>

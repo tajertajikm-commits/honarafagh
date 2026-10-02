@@ -17,7 +17,7 @@ import { Sidebar } from "./sidebar";
 
 interface Notice { id: string; title: string; body: string; link: string | null; readAt: string | null; createdAt: string }
 
-export function Topbar({ user, sections }: { user: { name: string; roles: string[] }; sections: { title: string; items: NavItem[] }[] }) {
+export function Topbar({ user, sections, badges }: { user: { name: string; roles: string[] }; sections: { title: string; items: NavItem[] }[]; badges?: Record<string, number> }) {
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -52,13 +52,13 @@ export function Topbar({ user, sections }: { user: { name: string; roles: string
       </button>
       <Sheet open={navOpen} onOpenChange={setNavOpen} title="منو" width="max-w-[280px]">
         <div className="-mx-6 -my-5 h-[calc(100dvh-72px)]">
-          <Sidebar sections={sections} onNavigate={() => setNavOpen(false)} />
+          <Sidebar sections={sections} badges={badges} onNavigate={() => setNavOpen(false)} />
         </div>
       </Sheet>
 
       <button onClick={() => setSearchOpen(true)} className="flex h-10 w-full max-w-md items-center gap-2.5 rounded-lg border border-line bg-surface px-3 text-[13.5px] text-subtle shadow-soft transition-colors hover:border-line-strong">
         <Search className="size-4" />
-        <span className="flex-1 text-start">جستجوی سفارش، مشتری، کالا…</span>
+        <span className="flex-1 text-start">کد سفارش (O-1042-0019)، کد مشتری (CUS-1042)، نام یا موبایل…</span>
         <span className="hidden items-center gap-1 sm:flex"><Kbd>Ctrl</Kbd><Kbd>K</Kbd></span>
       </button>
       <CommandSearch open={searchOpen} onOpenChange={setSearchOpen} />

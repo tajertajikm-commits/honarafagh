@@ -48,17 +48,17 @@ test("failed and cancelled payments are recorded on the order", async ({ page })
   await page.getByRole("link", { name: /ادامه و ثبت سفارش/ }).click();
   await page.getByRole("radio", { name: /پیک هنر آفاق/ }).click();
   await page.getByPlaceholder("خیابان، کوچه، پلاک، واحد").fill("خیابان آزادی، پلاک ۵");
-  await page.getByRole("radio", { name: /پرداخت کامل آنلاین/ }).click();
+  await page.getByRole("radio", { name: /^پرداخت آنلاین/ }).click();
   await page.getByRole("button", { name: "ثبت و پرداخت" }).click();
 
   await expect(page.getByRole("heading", { name: "درگاه پرداخت آزمایشی" })).toBeVisible();
   await page.getByRole("link", { name: /پرداخت ناموفق/ }).click();
   await expect(page.getByRole("heading", { name: "پرداخت ناموفق بود" })).toBeVisible();
   await page.getByRole("link", { name: "مشاهده سفارش" }).click();
-  await expect(page.getByRole("heading", { name: /سفارش #/ })).toBeVisible();
+  await expect(page.getByText(/[DO]-\d+-\d+/).first()).toBeVisible();
   await expect(page.getByText("پرداخت نشده").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "پرداخت آنلاین" }).click();
+  await page.getByRole("button", { name: /پرداخت آنلاین/ }).click();
   await expect(page.getByRole("heading", { name: "درگاه پرداخت آزمایشی" })).toBeVisible();
   await page.getByRole("link", { name: "انصراف از پرداخت" }).click();
   await expect(page.getByRole("heading", { name: "پرداخت لغو شد" })).toBeVisible();
@@ -68,18 +68,14 @@ test("failed and cancelled payments are recorded on the order", async ({ page })
 });
 
 const WORKSPACES = [
-  "/panel/control/", "/panel/orders/", "/panel/sales/", "/panel/sales/new/", "/panel/studio/", "/panel/production/",
-  "/panel/station/", "/panel/machines/", "/panel/qc/", "/panel/warehouse/", "/panel/inventory/", "/panel/procurement/",
-  "/panel/shipping/", "/panel/accounting/", "/panel/customers/", "/panel/employees/", "/panel/catalog/", "/panel/pricing/",
-  "/panel/workflows/", "/panel/reports/", "/panel/audit/", "/panel/settings/",
+  "/panel/dashboard/", "/panel/work/", "/panel/queues/item/?__id=digital", "/panel/queues/item/?__id=offset", "/panel/orders/",
+  "/panel/orders/new/", "/panel/accounting/", "/panel/customers/", "/panel/inventory/", "/panel/suppliers/", "/panel/employees/",
+  "/panel/catalog/", "/panel/pricing/", "/panel/audit/", "/panel/settings/",
 ];
 const DETAILS: [string, string][] = [
-  ["/panel/orders/", "/panel/orders/item/"],
+  ["/panel/orders/?tab=all", "/panel/orders/item/"],
   ["/panel/customers/", "/panel/customers/item/"],
-  ["/panel/employees/", "/panel/employees/item/"],
-  ["/panel/inventory/", "/panel/inventory/item/"],
   ["/panel/catalog/", "/panel/catalog/item/"],
-  ["/panel/sales/?tab=quotes", "/panel/sales/quotes/item/"],
 ];
 
 test("manager: every internal workspace and detail page renders from the shared data", async ({ page }) => {
@@ -92,10 +88,6 @@ test("manager: every internal workspace and detail page renders from the shared 
     await expect(page.getByRole("heading", { level: 1 }).first(), path).toBeVisible();
     await expect(page.getByText(PROBLEM), path).toHaveCount(0);
   }
-  await page.goto(at("/panel/workflows/"));
-  await booted(page);
-  await expect(page.getByText(/افست/).first()).toBeVisible();
-  await expect(page.getByText(/دیجیتال/).first()).toBeVisible();
   for (const [list, detail] of DETAILS) {
     await page.goto(at(list));
     await booted(page);
@@ -115,14 +107,14 @@ test("each demo role switches in from the DEMO MODE panel and lands in its own w
   await page.goto(at("/"));
   await booted(page);
   const landings: string[] = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 7; i++) {
     if (i > 0) {
       await page.goto(at("/"));
       await booted(page);
     }
     await page.getByRole("button", { name: /پنل حالت نمایشی/ }).click();
     const buttons = page.getByRole("dialog").locator("section").nth(1).getByRole("button");
-    await expect(buttons).toHaveCount(12);
+    await expect(buttons).toHaveCount(7);
     const label = (await buttons.nth(i).innerText()).split("\n")[0];
     await buttons.nth(i).click();
     await page.waitForURL((u) => u.pathname.startsWith(at("/panel/")) && u.pathname !== at("/panel/"), { timeout: 60_000 });
@@ -132,6 +124,8 @@ test("each demo role switches in from the DEMO MODE panel and lands in its own w
     landings.push(`${label} → ${new URL(page.url()).pathname}`);
   }
   console.info(landings.join("\n"));
-  expect(new Set(landings.map((l) => l.split(" → ")[1])).size).toBeGreaterThan(5);
+  // Managers land on the control center, everyone else on «کارهای من».
+  const paths = new Set(landings.map((l) => l.split(" → ")[1]));
+  expect(paths).toEqual(new Set([at("/panel/dashboard/"), at("/panel/work/")]));
   expect(errors).toEqual([]);
 });

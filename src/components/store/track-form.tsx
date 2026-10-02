@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { DateText } from "@/components/ui/misc";
-import { Status } from "@/components/ui/status";
 import { api, ApiError } from "@/lib/api-client";
-import { ORDER_STATUS } from "@/lib/labels";
-import { formatNumber, toEnDigits, toFaDigits } from "@/lib/persian";
-import { OrderTimeline, type TimelineStepView } from "./timeline";
+import type { CustomerStatus } from "@/lib/order-status";
+import { toEnDigits } from "@/lib/persian";
+import { StatusStepper } from "./timeline";
 
-interface Result { number: number; status: string; placedAt: string; dueDate: string | null; items: { title: string; quantity: number; unitLabel: string }[]; timeline: TimelineStepView[] }
+interface Result { code: string; title: string; createdAt: string; status: CustomerStatus; events: { message: string; createdAt: string }[] }
 
 export function TrackForm() {
-  const [number, setNumber] = useState("");
+  const [code, setCode] = useState("");
   const [phone, setPhone] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function TrackForm() {
           setLoading(true);
           setError(null);
           try {
-            setResult(await api<Result>(`track?number=${encodeURIComponent(toEnDigits(number))}&phone=${encodeURIComponent(toEnDigits(phone))}`));
+            setResult(await api<Result>(`track?code=${encodeURIComponent(code.trim())}&phone=${encodeURIComponent(toEnDigits(phone))}`));
           } catch (err) {
             setResult(null);
             setError(err instanceof ApiError ? err.message : "خطا");
@@ -36,22 +36,29 @@ export function TrackForm() {
           }
         }}
       >
-        <Field label="شماره سفارش"><Input ltr inputMode="numeric" value={number} onChange={(e) => setNumber(toEnDigits(e.target.value))} placeholder="100012" /></Field>
+        <Field label="کد سفارش"><Input ltr value={code} onChange={(e) => setCode(toEnDigits(e.target.value).toUpperCase())} placeholder="D-1042-0003" /></Field>
         <Field label="موبایل"><Input ltr inputMode="tel" value={phone} onChange={(e) => setPhone(toEnDigits(e.target.value))} placeholder="0912…" /></Field>
         <Button type="submit" loading={loading}>پیگیری</Button>
       </form>
       {error && <p className="mt-4 rounded-xl bg-danger-soft px-4 py-3 text-[13.5px] text-danger">{error}</p>}
       {result && (
         <div className="mt-6 rounded-2xl border border-line bg-surface p-6 shadow-card">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[18px] font-bold">سفارش #{toFaDigits(result.number)}</p>
-              <p className="text-[13px] text-muted">{result.items.map((i) => `${i.title} (${formatNumber(i.quantity)} ${i.unitLabel})`).join("، ")}</p>
-              {result.dueDate && <p className="text-[13px] text-muted">تحویل تقریبی: <DateText value={result.dueDate} /></p>}
+              <p className="text-[18px] font-bold" dir="ltr">{result.code}</p>
+              <p className="text-[13px] text-muted">{result.title} • <DateText value={result.createdAt} /></p>
             </div>
-            <Status map={ORDER_STATUS} value={result.status} />
+            <Badge tone={result.status.tone}>{result.status.label}</Badge>
           </div>
-          <OrderTimeline steps={result.timeline} className="mt-6" />
+          {result.status.index >= 0 && <StatusStepper index={result.status.index} className="mt-6" />}
+          {result.status.action && <p className="mt-4 rounded-xl bg-warning-soft px-4 py-3 text-[13.5px]">{result.status.action}</p>}
+          {result.events.length > 0 && (
+            <ul className="mt-6 space-y-2 border-t border-line pt-4 text-[13px]">
+              {result.events.slice(-6).reverse().map((ev, i) => (
+                <li key={i} className="flex justify-between gap-3"><span>{ev.message}</span><DateText value={ev.createdAt} withTime className="shrink-0 text-muted" /></li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </>

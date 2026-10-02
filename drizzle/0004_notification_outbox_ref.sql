@@ -1,1 +1,0 @@
-ALTER TABLE "notifications" ADD COLUMN "outbox_event_id" integer;

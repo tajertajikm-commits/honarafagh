@@ -17,14 +17,11 @@ pnpm dev
 `pnpm db:reset` drops and re-migrates the database named in `DATABASE_URL`. It
 refuses to run with `NODE_ENV=production` unless `--force` is passed.
 
-The seed creates reference data (methods, machine and step types, 13 machines,
-materials and stock, suppliers, 6 products with options, a published pricing
-version, Offset and Digital workflows, 18 roles, 12 employees, delivery
-methods, notification templates) and a demo scenario: 6 customers,
-backdated completed orders for reports, and live orders in every state
-(shortage with a purchase order, printing, QC rework, waiting for file, ready,
-out for delivery, proof awaiting approval, blocked prepress), plus an inquiry, a
-sent quote and scheduled maintenance.
+The seed creates reference data (5 machines incl. 1-, 4- and 8-colour presses, materials and
+stock, paper and lithography suppliers, store products with options, a published pricing
+version, 7 roles and the 7 staff members, shipping methods, notification templates, seller and
+invoice settings) and a demo scenario: 6 customers and about 23 orders covering every stage of
+both the Digital and Offset flows, built through the real services.
 
 ## Production
 

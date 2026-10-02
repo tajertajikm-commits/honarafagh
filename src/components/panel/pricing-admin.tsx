@@ -14,7 +14,16 @@ import { cn } from "@/lib/cn";
 import { METHOD, UNIT } from "@/lib/labels";
 import { formatNumber, formatPercent, toEnDigits } from "@/lib/persian";
 import { useApiAction } from "./actions";
-import type { BuilderProduct } from "./order-builder";
+
+export interface BuilderGroup {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  config: { min?: number; max?: number; default?: number; effect?: string; unit?: string } | null;
+  values: { key: string; label: string; isDefault: boolean; customTrim?: boolean }[];
+}
+export interface BuilderProduct { id: string; name: string; unitLabel: string; minQuantity: number; maxQuantity: number | null; quantityPresets: number[]; groups: BuilderGroup[] }
 
 type Rules = {
   methods: Record<string, Record<string, unknown>>;

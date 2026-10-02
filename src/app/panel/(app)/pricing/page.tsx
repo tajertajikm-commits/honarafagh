@@ -19,14 +19,14 @@ const STATUS: Record<string, [string, "success" | "warning" | "neutral"]> = { PU
 
 export default async function PricingPage({ searchParams }: { searchParams: Promise<{ version?: string; product?: string }> }) {
   const sp = await searchParams;
-  const ctx = await requireStaffPage({ permission: "pricing.view" });
+  const ctx = await requireStaffPage({ permission: "catalog.manage" });
   const sets = await listRuleSets(ctx);
   const all = sets.flatMap((s) => s.versions);
   const chosenId = (sp.version && all.some((v) => v.id === sp.version) ? sp.version : undefined) ?? all.find((v) => v.status === "DRAFT")?.id ?? all.find((v) => v.status === "PUBLISHED")?.id;
   const version = chosenId ? await getRuleVersion(ctx, chosenId) : null;
   const set = sets.find((s) => s.id === version?.ruleSetId);
   const publishedId = set?.versions.find((v) => v.status === "PUBLISHED")?.id ?? null;
-  const mats = await ctx.db.select({ sku: materials.sku, name: materials.name, unit: materials.unit, standardCost: materials.standardCost }).from(materials).where(eq(materials.isActive, true)).orderBy(asc(materials.categoryCode), asc(materials.name));
+  const mats = await ctx.db.select({ sku: materials.sku, name: materials.name, unit: materials.unit, standardCost: materials.standardCost }).from(materials).where(eq(materials.isActive, true)).orderBy(asc(materials.category), asc(materials.name));
   const products = await builderProducts(ctx.db);
   return (
     <>

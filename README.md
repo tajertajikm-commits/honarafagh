@@ -1,10 +1,11 @@
 # هنر آفاق — Printing House Operating Platform
 
-A Persian/RTL-first platform that runs a printing house end to end: the
-customer store and configurator, versioned dynamic pricing, quotations, a
-multi-domain order engine, configurable production workflows (separate Offset
-and Digital), capacity scheduling, transaction-based inventory, procurement,
-QC and rework, delivery, finance, role-based workspaces, audit and reports.
+A Persian/RTL-first platform that runs the Honar Afagh printing house as it actually works:
+store purchases and custom orders, one approval gate with a per-order station plan,
+separate Digital and Offset production flows (outsourced lithography, paper quotes with
+manager approval, press assignment, mandatory manager QC), audited priority, shipping,
+accounting with official and unofficial invoices, and a six-stage status for the customer.
+See [docs/workflows.md](docs/workflows.md).
 
 ## Quick start
 
@@ -20,11 +21,11 @@ pnpm dev                      # http://localhost:3000
 | Where | Login |
 |---|---|
 | Store `/login` | any demo customer mobile, e.g. `09121111111`; in demo mode the OTP is shown on screen (fake SMS provider) |
-| Staff panel `/panel/login` | `09120000001` (manager) … `09120000012`, password `honar1405` (override with `SEED_STAFF_PASSWORD`) |
+| Staff panel `/panel/login` | `09120000001` … `09120000007`, password `honar1405` (override with `SEED_STAFF_PASSWORD`) |
 
-Demo staff: 01 manager, 02 sales, 03 accountant, 04 warehouse + procurement,
-05 designer, 06 prepress/plates, 07 offset operator, 08 digital operator,
-09 cutting/lamination/UV, 10 binding/finishing/packaging, 11 QC, 12 shipping.
+Demo staff (placeholder phones): 01 Hamed Noorsalehi (manager), 02 Labafi (digital manager),
+03 Azad (digital operator), 04 Hossein Abdali (accountant), 05 Gholipour (lithography & offset),
+06 Mojtaba Hajghasemi (offset production), 07 Memarian (design). See [permissions](docs/permissions.md).
 
 ### Static demo (no server)
 
@@ -48,7 +49,7 @@ no database, Node.js or API keys needed. See [docs/static-demo.md](docs/static-d
 
 - [Architecture](docs/architecture.md)
 - [Database](docs/database.md)
-- [Workflow engine](docs/workflows.md) · [Offset workflow](docs/offset-workflow.md) · [Digital workflow](docs/digital-workflow.md)
+- [Order workflow (Digital & Offset)](docs/workflows.md)
 - [Pricing](docs/pricing.md)
 - [Roles and permissions](docs/permissions.md)
 - [Integrations](docs/integrations.md)
@@ -65,8 +66,10 @@ no database, Node.js or API keys needed. See [docs/static-demo.md](docs/static-d
 | SMS.ir (OTP + notifications) | Implemented against the documented REST API; **not tested against a live account** (needs API key, template id, line number) |
 | Zarinpal (online payment) | Implemented (REST v4 request/verify, sandbox flag); **not tested with a real merchant id** |
 | S3 storage | Adapter implemented; requires installing `@aws-sdk/client-s3` and credentials |
-| Holoo accounting | Adapter boundary only. Events are queued; **no Holoo API calls are made** until the API specification and credentials are available |
-| Delivery providers | Manual/internal courier implemented; external providers plug into the delivery provider registry |
+| Holoo accounting | Adapter boundary only. Issued invoices and payments are queued; **no Holoo API calls are made** until the API specification and credentials are available |
+| External lithography | Manual by design: status, supplier, dates and cost are recorded; no API |
+| Shipping | Manual: method, responsible person/carrier, tracking code and status are recorded; no carrier API |
+| Invoice PDF | Print-ready A4 page; PDF via the browser's «Save as PDF» (no server-side PDF renderer) |
 
 Fonts: the Abar Low font files were provided by the owner. Confirm the font
 licence before publishing this repository publicly.

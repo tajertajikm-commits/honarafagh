@@ -5,11 +5,9 @@ import { assertCan, can } from "@/server/core/context";
 import { AppError, forbidden } from "@/server/core/errors";
 import { enforceRateLimit } from "@/server/auth/rate-limit";
 import { storage } from "@/server/integrations/storage";
-import { addArtworkVersion, authorizeFileAccess, customerDecision, reviewArtwork, sendProof, storeUpload } from "@/server/modules/files/service";
+import { authorizeFileAccess, FILE_PURPOSES, storeUpload } from "@/server/modules/files/service";
 import { api } from "../router";
-import { note, uuid } from "./schemas";
 
-const PURPOSES = ["ARTWORK", "PROOF", "QC_IMAGE", "DELIVERY_PROOF", "ATTACHMENT", "PRODUCT_IMAGE", "PAYMENT_RECEIPT"] as const;
 const CUSTOMER_PURPOSES = new Set(["ARTWORK", "ATTACHMENT", "PAYMENT_RECEIPT"]);
 
 export const fileRoutes = [
@@ -23,10 +21,11 @@ export const fileRoutes = [
       throw new AppError("VALIDATION", "فرم بارگذاری نامعتبر است.");
     });
     const file = form.get("file");
-    const purpose = z.enum(PURPOSES).parse(form.get("purpose"));
+    const purpose = z.enum(FILE_PURPOSES).parse(form.get("purpose"));
     if (!(file instanceof File)) throw new AppError("VALIDATION", "فایلی انتخاب نشده است.");
     if (ctx.actor.kind === "customer" && !CUSTOMER_PURPOSES.has(purpose)) throw forbidden();
     if (ctx.actor.kind === "staff" && purpose === "PRODUCT_IMAGE") assertCan(ctx, "catalog.manage");
+    if (ctx.actor.kind === "staff" && purpose === "DESIGN" && !can(ctx, "design.work")) throw forbidden();
     const stored = await storeUpload(ctx, { data: Buffer.from(await file.arrayBuffer()), filename: file.name, purpose });
     return { id: stored.id, name: stored.originalName, size: stored.sizeBytes, mimeType: stored.mimeType };
   }),
@@ -48,18 +47,4 @@ export const fileRoutes = [
     });
   }),
 
-  api.post(
-    "order-items/:itemId/artwork",
-    { auth: "any", body: z.object({ fileId: uuid, stage: z.enum(["CUSTOMER_ORIGINAL", "DESIGNER", "PREPRESS", "PROOF", "PRINT_READY"]), note }) },
-    async ({ ctx, params, body }) => addArtworkVersion(ctx, params.itemId!, { fileId: body.fileId, stage: body.stage, note: body.note ?? undefined }),
-  ),
-  api.post("artwork/:id/review", { auth: "staff", body: z.object({ decision: z.enum(["APPROVE", "REJECT"]), note: z.string().max(1000).optional() }) }, async ({ ctx, params, body }) =>
-    reviewArtwork(ctx, params.id!, body),
-  ),
-  api.post("artwork/:id/send-proof", { auth: "staff", body: z.object({ note: z.string().max(1000).optional() }) }, async ({ ctx, params, body }) => sendProof(ctx, params.id!, body.note)),
-  api.post("artwork/:id/decision", { auth: "customer", body: z.object({ approve: z.boolean(), comment: z.string().max(1000).optional() }) }, async ({ ctx, params, body }) =>
-    customerDecision(ctx, params.id!, body),
-  ),
 ];
-
-export const canViewFiles = can;

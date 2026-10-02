@@ -7,78 +7,23 @@
  */
 import type { Permission } from "@/server/auth/permissions";
 import type { OptionEffects, PricingRules, ProductSpec } from "@/server/modules/pricing/types";
-import type { TemplateStepInput } from "@/server/modules/workflow/types";
 
-// ── Production methods, machine types, step types ───────────────────────────
+// ── Suppliers ───────────────────────────────────────────────────────────────
 
-export const PRODUCTION_METHODS = [
-  { code: "OFFSET", name: "چاپ افست", description: "تیراژ بالا، زینک و ماشین ورقی چهاررنگ", sortOrder: 1 },
-  { code: "DIGITAL", name: "چاپ دیجیتال", description: "تیراژ پایین و فوری، بدون زینک", sortOrder: 2 },
-];
-
-export const MACHINE_TYPES = [
-  { code: "CTP", name: "زینک‌ساز CTP", capacityUnit: "PLATE" },
-  { code: "OFFSET_PRESS", name: "ماشین چاپ افست", capacityUnit: "SHEET" },
-  { code: "DIGITAL_PRESS", name: "ماشین چاپ دیجیتال", capacityUnit: "SIDE" },
-  { code: "GUILLOTINE", name: "گیوتین برش", capacityUnit: "LIFT" },
-  { code: "LAMINATOR", name: "دستگاه سلفون", capacityUnit: "SHEET" },
-  { code: "UV_COATER", name: "دستگاه UV", capacityUnit: "SHEET" },
-  { code: "FOIL_STAMPER", name: "دستگاه طلاکوب و برجسته", capacityUnit: "UNIT" },
-  { code: "DIE_CUTTER", name: "دستگاه قالب‌برش", capacityUnit: "SHEET" },
-  { code: "PLOTTER", name: "کاتر پلاتر", capacityUnit: "SHEET" },
-  { code: "BINDER", name: "دستگاه صحافی", capacityUnit: "UNIT" },
-];
-
-export const STEP_TYPES = [
-  { code: "DESIGN", name: "طراحی", category: "DESIGN", machineTypeCode: null, color: "#8B5CF6" },
-  { code: "GATE_FILE", name: "تأیید فایل", category: "GATE", machineTypeCode: null, color: "#64748B" },
-  { code: "GATE_MATERIAL", name: "آماده‌بودن مواد", category: "GATE", machineTypeCode: null, color: "#64748B" },
-  { code: "GATE_PAYMENT", name: "کنترل پیش‌پرداخت", category: "GATE", machineTypeCode: null, color: "#64748B" },
-  { code: "PREPRESS", name: "پیش از چاپ", category: "PREPRESS", machineTypeCode: null, color: "#0EA5E9" },
-  { code: "PLATE_MAKING", name: "زینک‌سازی", category: "PREPRESS", machineTypeCode: "CTP", color: "#0284C7" },
-  { code: "PAPER_CUTTING", name: "برش کاغذ", category: "PREPRESS", machineTypeCode: "GUILLOTINE", color: "#0369A1" },
-  { code: "OFFSET_PRINTING", name: "چاپ افست", category: "PRINTING", machineTypeCode: "OFFSET_PRESS", color: "#F26422" },
-  { code: "DIGITAL_PRINTING", name: "چاپ دیجیتال", category: "PRINTING", machineTypeCode: "DIGITAL_PRESS", color: "#ED1D26" },
-  { code: "QC", name: "کنترل کیفیت", category: "QC", machineTypeCode: null, color: "#16A34A" },
-  { code: "LAMINATION", name: "سلفون / لمینیت", category: "FINISHING", machineTypeCode: "LAMINATOR", color: "#FDB913" },
-  { code: "UV_COATING", name: "پوشش UV", category: "FINISHING", machineTypeCode: "UV_COATER", color: "#EAB308" },
-  { code: "CUTTING", name: "برش", category: "FINISHING", machineTypeCode: "GUILLOTINE", color: "#CA8A04" },
-  { code: "FOIL_STAMPING", name: "طلاکوب", category: "FINISHING", machineTypeCode: "FOIL_STAMPER", color: "#A16207" },
-  { code: "EMBOSSING", name: "برجسته‌کاری", category: "FINISHING", machineTypeCode: "FOIL_STAMPER", color: "#A16207" },
-  { code: "DIE_CUTTING", name: "قالب‌برش", category: "FINISHING", machineTypeCode: "DIE_CUTTER", color: "#854D0E" },
-  { code: "PLOTTER_CUTTING", name: "برش پلاتر", category: "FINISHING", machineTypeCode: "PLOTTER", color: "#854D0E" },
-  { code: "CORNER_ROUNDING", name: "گردکردن گوشه", category: "FINISHING", machineTypeCode: null, color: "#92400E" },
-  { code: "BINDING", name: "صحافی", category: "FINISHING", machineTypeCode: "BINDER", color: "#78350F" },
-  { code: "PACKAGING", name: "بسته‌بندی", category: "PACKAGING", machineTypeCode: null, color: "#475569" },
-].map((s, i) => ({ ...s, sortOrder: i }));
-
-// ── Materials ───────────────────────────────────────────────────────────────
-
-export const MATERIAL_CATEGORIES = [
-  { code: "PAPER", name: "کاغذ و مقوا" },
-  { code: "PLATE", name: "زینک" },
-  { code: "INK", name: "مرکب و تونر" },
-  { code: "FILM", name: "فیلم سلفون" },
-  { code: "VARNISH", name: "ورنی و UV" },
-  { code: "FOIL", name: "فویل" },
-  { code: "BINDING", name: "ملزومات صحافی" },
-  { code: "PACKAGING", name: "بسته‌بندی" },
-].map((c, i) => ({ ...c, sortOrder: i }));
-
-export const LOCATIONS = [
-  { code: "MAIN", name: "انبار اصلی", description: "طبقه همکف، کنار سالن چاپ" },
-  { code: "DIGI", name: "انبار دیجیتال", description: "قفسه‌های سالن دیجیتال" },
-];
-
+/** Paper suppliers are phoned for quotes; lithography is outsourced. */
 export const SUPPLIERS = [
-  { key: "paper", name: "بازرگانی کاغذ پارس", contactName: "آقای رحیمی", phone: "02133912040", leadTimeDays: 2 },
-  { key: "plate", name: "صنایع زینک‌سازی نوین", contactName: "خانم اکبری", phone: "02166754410", leadTimeDays: 3 },
-  { key: "consumables", name: "لوازم چاپ آریا", contactName: "آقای کاظمی", phone: "02133990012", leadTimeDays: 4 },
+  { key: "paper-pars", name: "بازرگانی کاغذ پارس", kind: "PAPER", contactName: "آقای رحیمی", phone: "02133912040" },
+  { key: "paper-arya", name: "کاغذ آریا", kind: "PAPER", contactName: "آقای صدری", phone: "02133945512" },
+  { key: "paper-sepid", name: "پخش کاغذ سپید", kind: "PAPER", contactName: "خانم نیک‌نام", phone: "02166702288" },
+  { key: "litho-novin", name: "لیتوگرافی نوین", kind: "LITHO", contactName: "خانم اکبری", phone: "02166754410" },
+  { key: "litho-ziba", name: "لیتوگرافی زیبا", kind: "LITHO", contactName: "آقای فرهادی", phone: "02133118870" },
+  { key: "consumables", name: "لوازم چاپ آریا", kind: "OTHER", contactName: "آقای کاظمی", phone: "02133990012" },
 ];
 
 type MaterialSeed = {
   sku: string;
   name: string;
+  /** PAPER | CARDBOARD | FILM | UV | BINDING | PLATE | PACKAGING | OTHER */
   category: string;
   unit: string;
   standardCost: number;
@@ -92,27 +37,30 @@ type MaterialSeed = {
 
 export const MATERIALS: MaterialSeed[] = [
   // Offset stock: parent sheets 70×100 cm
-  { sku: "P-GL135-70", name: "گلاسه ۱۳۵ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 280_000, reorderPoint: 2000, reorderQuantity: 5000, supplier: "paper", location: "MAIN", onHand: 12_000, paper: { paperType: "گلاسه", brand: "APP", grammage: 135, w: 1000, h: 700, color: "سفید" } },
-  { sku: "P-GL300-70", name: "گلاسه ۳۰۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 650_000, reorderPoint: 1000, reorderQuantity: 3000, supplier: "paper", location: "MAIN", onHand: 4_500, paper: { paperType: "گلاسه", brand: "APP", grammage: 300, w: 1000, h: 700, color: "سفید" } },
-  { sku: "P-TH70-70", name: "تحریر ۷۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 120_000, reorderPoint: 3000, reorderQuantity: 10_000, supplier: "paper", location: "MAIN", onHand: 800, paper: { paperType: "تحریر", brand: "چوکا", grammage: 70, w: 1000, h: 700, color: "سفید" } },
-  { sku: "P-TH80-70", name: "تحریر ۸۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 140_000, reorderPoint: 2000, reorderQuantity: 5000, supplier: "paper", location: "MAIN", onHand: 6_000, paper: { paperType: "تحریر", brand: "چوکا", grammage: 80, w: 1000, h: 700, color: "سفید" } },
-  { sku: "P-KT300-70", name: "کتان ۳۰۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 1_200_000, reorderPoint: 300, reorderQuantity: 1000, supplier: "paper", location: "MAIN", onHand: 650, paper: { paperType: "کتان", brand: "Fedrigoni", grammage: 300, w: 1000, h: 700, color: "شیری" } },
+  { sku: "P-GL135-70", name: "گلاسه ۱۳۵ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 280_000, reorderPoint: 2000, reorderQuantity: 5000, supplier: "paper-pars", location: "MAIN", onHand: 12_000, paper: { paperType: "گلاسه", brand: "APP", grammage: 135, w: 1000, h: 700, color: "سفید" } },
+  { sku: "P-GL300-70", name: "گلاسه ۳۰۰ گرم ۷۰×۱۰۰", category: "CARDBOARD", unit: "SHEET", standardCost: 650_000, reorderPoint: 1000, reorderQuantity: 3000, supplier: "paper-pars", location: "MAIN", onHand: 4_500, paper: { paperType: "گلاسه", brand: "APP", grammage: 300, w: 1000, h: 700, color: "سفید" } },
+  { sku: "P-TH70-70", name: "تحریر ۷۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 120_000, reorderPoint: 3000, reorderQuantity: 10_000, supplier: "paper-pars", location: "MAIN", onHand: 800, paper: { paperType: "تحریر", brand: "چوکا", grammage: 70, w: 1000, h: 700, color: "سفید" } },
+  { sku: "P-TH80-70", name: "تحریر ۸۰ گرم ۷۰×۱۰۰", category: "PAPER", unit: "SHEET", standardCost: 140_000, reorderPoint: 2000, reorderQuantity: 5000, supplier: "paper-pars", location: "MAIN", onHand: 6_000, paper: { paperType: "تحریر", brand: "چوکا", grammage: 80, w: 1000, h: 700, color: "سفید" } },
+  { sku: "P-KT300-70", name: "کتان ۳۰۰ گرم ۷۰×۱۰۰", category: "CARDBOARD", unit: "SHEET", standardCost: 1_200_000, reorderPoint: 300, reorderQuantity: 1000, supplier: "paper-pars", location: "MAIN", onHand: 650, paper: { paperType: "کتان", brand: "Fedrigoni", grammage: 300, w: 1000, h: 700, color: "شیری" } },
   // Digital stock: pre-cut SRA3 (32×45 cm)
-  { sku: "P-GL135-SRA3", name: "گلاسه ۱۳۵ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 45_000, reorderPoint: 1000, reorderQuantity: 5000, supplier: "paper", location: "DIGI", onHand: 4_000, paper: { paperType: "گلاسه", brand: "APP", grammage: 135, w: 450, h: 320, color: "سفید" } },
-  { sku: "P-GL300-SRA3", name: "گلاسه ۳۰۰ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 110_000, reorderPoint: 800, reorderQuantity: 3000, supplier: "paper", location: "DIGI", onHand: 2_500, paper: { paperType: "گلاسه", brand: "APP", grammage: 300, w: 450, h: 320, color: "سفید" } },
-  { sku: "P-TH80-SRA3", name: "تحریر ۸۰ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 25_000, reorderPoint: 2000, reorderQuantity: 10_000, supplier: "paper", location: "DIGI", onHand: 9_000, paper: { paperType: "تحریر", brand: "چوکا", grammage: 80, w: 450, h: 320, color: "سفید" } },
-  { sku: "P-KT300-SRA3", name: "کتان ۳۰۰ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 200_000, reorderPoint: 300, reorderQuantity: 1000, supplier: "paper", location: "DIGI", onHand: 180, paper: { paperType: "کتان", brand: "Fedrigoni", grammage: 300, w: 450, h: 320, color: "شیری" } },
-  { sku: "P-STK-SRA3", name: "کاغذ استیکر گلاسه SRA3", category: "PAPER", unit: "SHEET", standardCost: 150_000, reorderPoint: 500, reorderQuantity: 2000, supplier: "paper", location: "DIGI", onHand: 1_200, paper: { paperType: "استیکر", brand: "Fasson", grammage: 80, w: 450, h: 320, color: "سفید" } },
+  { sku: "P-GL135-SRA3", name: "گلاسه ۱۳۵ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 45_000, reorderPoint: 1000, reorderQuantity: 5000, supplier: "paper-pars", location: "DIGI", onHand: 4_000, paper: { paperType: "گلاسه", brand: "APP", grammage: 135, w: 450, h: 320, color: "سفید" } },
+  { sku: "P-GL300-SRA3", name: "گلاسه ۳۰۰ گرم SRA3", category: "CARDBOARD", unit: "SHEET", standardCost: 110_000, reorderPoint: 800, reorderQuantity: 3000, supplier: "paper-pars", location: "DIGI", onHand: 2_500, paper: { paperType: "گلاسه", brand: "APP", grammage: 300, w: 450, h: 320, color: "سفید" } },
+  { sku: "P-TH80-SRA3", name: "تحریر ۸۰ گرم SRA3", category: "PAPER", unit: "SHEET", standardCost: 25_000, reorderPoint: 2000, reorderQuantity: 10_000, supplier: "paper-pars", location: "DIGI", onHand: 9_000, paper: { paperType: "تحریر", brand: "چوکا", grammage: 80, w: 450, h: 320, color: "سفید" } },
+  { sku: "P-KT300-SRA3", name: "کتان ۳۰۰ گرم SRA3", category: "CARDBOARD", unit: "SHEET", standardCost: 200_000, reorderPoint: 300, reorderQuantity: 1000, supplier: "paper-pars", location: "DIGI", onHand: 180, paper: { paperType: "کتان", brand: "Fedrigoni", grammage: 300, w: 450, h: 320, color: "شیری" } },
+  { sku: "P-STK-SRA3", name: "کاغذ استیکر گلاسه SRA3", category: "PAPER", unit: "SHEET", standardCost: 150_000, reorderPoint: 500, reorderQuantity: 2000, supplier: "paper-pars", location: "DIGI", onHand: 1_200, paper: { paperType: "استیکر", brand: "Fasson", grammage: 80, w: 450, h: 320, color: "سفید" } },
   // Plates & consumables
-  { sku: "PL-CTP-5274", name: "زینک CTP ۵۲×۷۴", category: "PLATE", unit: "PIECE", standardCost: 1_200_000, reorderPoint: 60, reorderQuantity: 200, supplier: "plate", location: "MAIN", onHand: 140 },
+  { sku: "PL-CTP-5274", name: "زینک CTP ۵۲×۷۴", category: "PLATE", unit: "PIECE", standardCost: 1_200_000, reorderPoint: 60, reorderQuantity: 200, supplier: "litho-novin", location: "MAIN", onHand: 140 },
   { sku: "F-LAM-GLOSS", name: "فیلم سلفون براق", category: "FILM", unit: "SQM", standardCost: 45_000, reorderPoint: 500, reorderQuantity: 2000, supplier: "consumables", location: "MAIN", onHand: 3_000 },
   { sku: "F-LAM-MATTE", name: "فیلم سلفون مات", category: "FILM", unit: "SQM", standardCost: 55_000, reorderPoint: 500, reorderQuantity: 2000, supplier: "consumables", location: "MAIN", onHand: 2_400 },
-  { sku: "V-UV-SPOT", name: "ورنی UV موضعی", category: "VARNISH", unit: "LITER", standardCost: 3_500_000, reorderPoint: 10, reorderQuantity: 40, supplier: "consumables", location: "MAIN", onHand: 28 },
-  { sku: "FO-GOLD", name: "فویل طلایی", category: "FOIL", unit: "METER", standardCost: 90_000, reorderPoint: 100, reorderQuantity: 500, supplier: "consumables", location: "MAIN", onHand: 420 },
+  { sku: "V-UV-SPOT", name: "ورنی UV موضعی", category: "UV", unit: "LITER", standardCost: 3_500_000, reorderPoint: 10, reorderQuantity: 40, supplier: "consumables", location: "MAIN", onHand: 28 },
+  { sku: "FO-GOLD", name: "فویل طلایی", category: "OTHER", unit: "METER", standardCost: 90_000, reorderPoint: 100, reorderQuantity: 500, supplier: "consumables", location: "MAIN", onHand: 420 },
   { sku: "B-WIRE", name: "سیم دوبل (وایر) A5/A4", category: "BINDING", unit: "PIECE", standardCost: 18_000, reorderPoint: 300, reorderQuantity: 2000, supplier: "consumables", location: "MAIN", onHand: 1_500 },
   { sku: "B-GLUE", name: "چسب گرم صحافی", category: "BINDING", unit: "KG", standardCost: 2_800_000, reorderPoint: 10, reorderQuantity: 50, supplier: "consumables", location: "MAIN", onHand: 35 },
+  { sku: "C-IVORY350-SRA3", name: "مقوا ایندربرد ۳۵۰ گرم SRA3", category: "CARDBOARD", unit: "SHEET", standardCost: 160_000, reorderPoint: 400, reorderQuantity: 1500, supplier: "paper-pars", location: "DIGI", onHand: 900 },
+  { sku: "C-GREY450-70", name: "مقوا پشت‌طوسی ۴۵۰ گرم ۷۰×۱۰۰", category: "CARDBOARD", unit: "SHEET", standardCost: 520_000, reorderPoint: 300, reorderQuantity: 1000, supplier: "paper-pars", location: "MAIN", onHand: 220 },
+  { sku: "PK-SHRINK", name: "نایلون شیرینگ", category: "PACKAGING", unit: "ROLL", standardCost: 1_900_000, reorderPoint: 5, reorderQuantity: 20, supplier: "consumables", location: "MAIN", onHand: 12 },
   { sku: "PK-CARTON", name: "کارتن بسته‌بندی متوسط", category: "PACKAGING", unit: "PIECE", standardCost: 250_000, reorderPoint: 100, reorderQuantity: 500, supplier: "consumables", location: "MAIN", onHand: 380 },
-  { sku: "INK-CMYK", name: "مرکب افست CMYK (ست)", category: "INK", unit: "KG", standardCost: 9_000_000, reorderPoint: 20, reorderQuantity: 60, supplier: "consumables", location: "MAIN", onHand: 45 },
+  { sku: "INK-CMYK", name: "مرکب افست CMYK (ست)", category: "OTHER", unit: "KG", standardCost: 9_000_000, reorderPoint: 20, reorderQuantity: 60, supplier: "consumables", location: "MAIN", onHand: 45 },
 ];
 
 // ── Pricing rules (version 1) ───────────────────────────────────────────────
@@ -192,61 +140,6 @@ export const PRICING_RULES: PricingRules = {
 
 // ── Workflow templates ──────────────────────────────────────────────────────
 
-const PRINT_QC_CHECKLIST = ["تطابق رنگ با پروف تأییدشده", "رجیستر و هم‌خوانی رنگ‌ها", "نبود لکه، خط و کثیفی", "شمارش تعداد برگ چاپ‌شده"];
-const FINAL_QC_CHECKLIST = ["ابعاد نهایی و دقت برش", "کیفیت عملیات تکمیلی", "کیفیت صحافی و ترتیب صفحات", "شمارش تعداد نهایی سفارش"];
-
-/** Offset: derived from the owner's flowchart, with gates and exception paths made explicit. */
-export const OFFSET_TEMPLATE_STEPS: TemplateStepInput[] = [
-  { key: "DESIGN", name: "طراحی / اصلاح فایل", stepType: "DESIGN", dependsOn: [], condition: { type: "IF_FLAG", flag: "NEEDS_DESIGN" }, gate: null, machineType: null, defaultMinutes: 240, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: [] },
-  { key: "FILE_APPROVAL", name: "تأیید نهایی فایل", stepType: "GATE_FILE", dependsOn: ["DESIGN"], condition: { type: "ALWAYS" }, gate: { kind: "FILE_APPROVAL" }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: [] },
-  { key: "PREPRESS", name: "پیش از چاپ (مونتاژ، تفکیک رنگ)", stepType: "PREPRESS", dependsOn: ["FILE_APPROVAL"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 45, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: ["بررسی رزولوشن و حاشیه برش", "تبدیل رنگ به CMYK", "مونتاژ و تهیه پروف"] },
-  { key: "PAYMENT", name: "کنترل پیش‌پرداخت", stepType: "GATE_PAYMENT", dependsOn: [], condition: { type: "ALWAYS" }, gate: { kind: "PAYMENT" }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PAPER", name: "بررسی / تأمین کاغذ", stepType: "GATE_MATERIAL", dependsOn: [], condition: { type: "ALWAYS" }, gate: { kind: "MATERIAL", purposes: ["PAPER"] }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PLATE_STOCK", name: "بررسی / تأمین زینک", stepType: "GATE_MATERIAL", dependsOn: [], condition: { type: "ALWAYS" }, gate: { kind: "MATERIAL", purposes: ["PLATE"] }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PLATE_MAKING", name: "زینک‌سازی (CTP)", stepType: "PLATE_MAKING", dependsOn: ["PREPRESS", "PLATE_STOCK", "PAYMENT"], condition: { type: "ALWAYS" }, gate: null, machineType: "CTP", defaultMinutes: 20, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: ["کنترل زینک از نظر خط و خش"] },
-  { key: "PAPER_CUTTING", name: "برش کاغذ به ابعاد ماشین", stepType: "PAPER_CUTTING", dependsOn: ["PAPER"], condition: { type: "ALWAYS" }, gate: null, machineType: "GUILLOTINE", defaultMinutes: 30, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PRINTING", name: "چاپ افست", stepType: "OFFSET_PRINTING", dependsOn: ["PLATE_MAKING", "PAPER_CUTTING"], condition: { type: "ALWAYS" }, gate: null, machineType: "OFFSET_PRESS", defaultMinutes: 60, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "PRODUCTION", checklist: [] },
-  { key: "PRINT_QC", name: "کنترل کیفیت چاپ", stepType: "QC", dependsOn: ["PRINTING"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 20, minLagMinutes: 0, isQc: true, reworkTargets: ["PRINTING", "PLATE_MAKING"], milestone: "PRODUCTION", checklist: PRINT_QC_CHECKLIST },
-  // Ink must dry before lamination (4 h).
-  { key: "LAMINATION", name: "سلفون / لمینیت", stepType: "LAMINATION", dependsOn: ["PRINT_QC"], condition: { type: "IF_OPERATION", stepType: "LAMINATION" }, gate: null, machineType: "LAMINATOR", defaultMinutes: 45, minLagMinutes: 240, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "CUTTING", name: "برش", stepType: "CUTTING", dependsOn: ["LAMINATION"], condition: { type: "IF_OPERATION", stepType: "CUTTING" }, gate: null, machineType: "GUILLOTINE", defaultMinutes: 30, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "UV", name: "پوشش UV موضعی / کامل", stepType: "UV_COATING", dependsOn: ["CUTTING"], condition: { type: "IF_OPERATION", stepType: "UV_COATING" }, gate: null, machineType: "UV_COATER", defaultMinutes: 60, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "FOIL", name: "طلاکوب", stepType: "FOIL_STAMPING", dependsOn: ["UV"], condition: { type: "IF_OPERATION", stepType: "FOIL_STAMPING" }, gate: null, machineType: "FOIL_STAMPER", defaultMinutes: 60, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "EMBOSS", name: "برجسته‌کاری", stepType: "EMBOSSING", dependsOn: ["FOIL"], condition: { type: "IF_OPERATION", stepType: "EMBOSSING" }, gate: null, machineType: "FOIL_STAMPER", defaultMinutes: 60, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "DIE_CUT", name: "قالب‌برش", stepType: "DIE_CUTTING", dependsOn: ["EMBOSS"], condition: { type: "IF_OPERATION", stepType: "DIE_CUTTING" }, gate: null, machineType: "DIE_CUTTER", defaultMinutes: 60, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "CORNERS", name: "گردکردن گوشه", stepType: "CORNER_ROUNDING", dependsOn: ["DIE_CUT"], condition: { type: "IF_OPERATION", stepType: "CORNER_ROUNDING" }, gate: null, machineType: null, defaultMinutes: 20, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "BINDING", name: "صحافی", stepType: "BINDING", dependsOn: ["CORNERS"], condition: { type: "IF_OPERATION", stepType: "BINDING" }, gate: null, machineType: "BINDER", defaultMinutes: 90, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "FINAL_QC", name: "کنترل کیفیت نهایی", stepType: "QC", dependsOn: ["BINDING"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 30, minLagMinutes: 0, isQc: true, reworkTargets: ["PRINTING", "LAMINATION", "CUTTING", "UV", "BINDING"], milestone: "QC", checklist: FINAL_QC_CHECKLIST },
-  { key: "PACKAGING", name: "بسته‌بندی", stepType: "PACKAGING", dependsOn: ["FINAL_QC"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 30, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "PACKAGING", checklist: ["برچسب سفارش روی بسته", "شمارش تعداد"] },
-];
-
-/**
- * Digital: no plates, no plate stock, no pre-cutting (SRA3 stock), inline QC
- * during printing, short cool-down instead of ink drying, plotter cutting for
- * shaped items, and cheap immediate reprints on rejection.
- */
-export const DIGITAL_TEMPLATE_STEPS: TemplateStepInput[] = [
-  { key: "DESIGN", name: "طراحی / اصلاح فایل", stepType: "DESIGN", dependsOn: [], condition: { type: "IF_FLAG", flag: "NEEDS_DESIGN" }, gate: null, machineType: null, defaultMinutes: 180, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: [] },
-  { key: "FILE_APPROVAL", name: "تأیید نهایی فایل", stepType: "GATE_FILE", dependsOn: ["DESIGN"], condition: { type: "ALWAYS" }, gate: { kind: "FILE_APPROVAL" }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: [] },
-  { key: "PREPRESS", name: "پیش‌پردازش، مونتاژ و RIP", stepType: "PREPRESS", dependsOn: ["FILE_APPROVAL"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 15, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FILE", checklist: ["پروفایل رنگ و RIP", "مونتاژ روی SRA3"] },
-  { key: "PAYMENT", name: "کنترل پیش‌پرداخت", stepType: "GATE_PAYMENT", dependsOn: [], condition: { type: "ALWAYS" }, gate: { kind: "PAYMENT" }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PAPER", name: "آماده‌بودن کاغذ", stepType: "GATE_MATERIAL", dependsOn: [], condition: { type: "ALWAYS" }, gate: { kind: "MATERIAL", purposes: ["PAPER"] }, machineType: null, defaultMinutes: 0, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "MATERIALS", checklist: [] },
-  { key: "PRINTING", name: "چاپ دیجیتال و کنترل حین چاپ", stepType: "DIGITAL_PRINTING", dependsOn: ["PREPRESS", "PAPER", "PAYMENT"], condition: { type: "ALWAYS" }, gate: null, machineType: "DIGITAL_PRESS", defaultMinutes: 20, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "PRODUCTION", checklist: ["کالیبراسیون رنگ پیش از چاپ", "کنترل برگ نمونه", "بررسی رجیستر پشت و رو"] },
-  { key: "LAMINATION", name: "سلفون / لمینیت", stepType: "LAMINATION", dependsOn: ["PRINTING"], condition: { type: "IF_OPERATION", stepType: "LAMINATION" }, gate: null, machineType: "LAMINATOR", defaultMinutes: 20, minLagMinutes: 20, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "UV", name: "پوشش UV", stepType: "UV_COATING", dependsOn: ["LAMINATION"], condition: { type: "IF_OPERATION", stepType: "UV_COATING" }, gate: null, machineType: "UV_COATER", defaultMinutes: 40, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "CUTTING", name: "برش گیوتین", stepType: "CUTTING", dependsOn: ["UV"], condition: { type: "IF_OPERATION", stepType: "CUTTING" }, gate: null, machineType: "GUILLOTINE", defaultMinutes: 15, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "PLOTTER", name: "برش پلاتر", stepType: "PLOTTER_CUTTING", dependsOn: ["UV"], condition: { type: "IF_OPERATION", stepType: "PLOTTER_CUTTING" }, gate: null, machineType: "PLOTTER", defaultMinutes: 30, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "CORNERS", name: "گردکردن گوشه", stepType: "CORNER_ROUNDING", dependsOn: ["CUTTING", "PLOTTER"], condition: { type: "IF_OPERATION", stepType: "CORNER_ROUNDING" }, gate: null, machineType: null, defaultMinutes: 15, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "BINDING", name: "صحافی", stepType: "BINDING", dependsOn: ["CORNERS"], condition: { type: "IF_OPERATION", stepType: "BINDING" }, gate: null, machineType: "BINDER", defaultMinutes: 45, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "FINISHING", checklist: [] },
-  { key: "FINAL_QC", name: "کنترل کیفیت نهایی", stepType: "QC", dependsOn: ["BINDING"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 15, minLagMinutes: 0, isQc: true, reworkTargets: ["PRINTING", "LAMINATION", "CUTTING", "PLOTTER", "BINDING"], milestone: "QC", checklist: FINAL_QC_CHECKLIST },
-  { key: "PACKAGING", name: "بسته‌بندی", stepType: "PACKAGING", dependsOn: ["FINAL_QC"], condition: { type: "ALWAYS" }, gate: null, machineType: null, defaultMinutes: 15, minLagMinutes: 0, isQc: false, reworkTargets: [], milestone: "PACKAGING", checklist: ["برچسب سفارش روی بسته"] },
-];
-
-export const WORKFLOW_TEMPLATES = [
-  { code: "OFFSET_STANDARD", name: "گردش‌کار استاندارد افست", methodCode: "OFFSET", description: "بر اساس فلوچارت فرایند سفارش افست هنر آفاق", steps: OFFSET_TEMPLATE_STEPS },
-  { code: "DIGITAL_STANDARD", name: "گردش‌کار استاندارد دیجیتال", methodCode: "DIGITAL", description: "فرایند کوتاه چاپ دیجیتال با کنترل حین چاپ", steps: DIGITAL_TEMPLATE_STEPS },
-];
-
 // ── Catalog ─────────────────────────────────────────────────────────────────
 
 export const CATEGORIES = [
@@ -287,7 +180,7 @@ export interface ProductSeed {
   highlights: string[];
   image: string;
   spec: ProductSpec;
-  methods: { methodCode: string; workflowTemplateCode: string; minQuantity: number; maxQuantity: number | null }[];
+  methods: { methodCode: "DIGITAL" | "OFFSET"; minQuantity: number; maxQuantity: number | null }[];
   groups: OptionGroupSeed[];
 }
 
@@ -338,8 +231,8 @@ export const PRODUCTS: ProductSeed[] = [
       methodSelection: "CHEAPEST",
     },
     methods: [
-      { methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 100, maxQuantity: 3000 },
-      { methodCode: "OFFSET", workflowTemplateCode: "OFFSET_STANDARD", minQuantity: 1000, maxQuantity: null },
+      { methodCode: "DIGITAL", minQuantity: 100, maxQuantity: 3000 },
+      { methodCode: "OFFSET", minQuantity: 1000, maxQuantity: null },
     ],
     groups: [
       paperOption("main", [
@@ -393,8 +286,8 @@ export const PRODUCTS: ProductSeed[] = [
       methodSelection: "CHEAPEST",
     },
     methods: [
-      { methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 50, maxQuantity: 1500 },
-      { methodCode: "OFFSET", workflowTemplateCode: "OFFSET_STANDARD", minQuantity: 500, maxQuantity: null },
+      { methodCode: "DIGITAL", minQuantity: 50, maxQuantity: 1500 },
+      { methodCode: "OFFSET", minQuantity: 500, maxQuantity: null },
     ],
     groups: [
       {
@@ -450,8 +343,8 @@ export const PRODUCTS: ProductSeed[] = [
       methodSelection: "CHEAPEST",
     },
     methods: [
-      { methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 10, maxQuantity: 300 },
-      { methodCode: "OFFSET", workflowTemplateCode: "OFFSET_STANDARD", minQuantity: 100, maxQuantity: null },
+      { methodCode: "DIGITAL", minQuantity: 10, maxQuantity: 300 },
+      { methodCode: "OFFSET", minQuantity: 100, maxQuantity: null },
     ],
     groups: [
       {
@@ -532,8 +425,8 @@ export const PRODUCTS: ProductSeed[] = [
       methodSelection: "CHEAPEST",
     },
     methods: [
-      { methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 20, maxQuantity: 300 },
-      { methodCode: "OFFSET", workflowTemplateCode: "OFFSET_STANDARD", minQuantity: 200, maxQuantity: null },
+      { methodCode: "DIGITAL", minQuantity: 20, maxQuantity: 300 },
+      { methodCode: "OFFSET", minQuantity: 200, maxQuantity: null },
     ],
     groups: [
       { key: "pages", label: "تعداد صفحات داخلی", type: "NUMBER", required: true, config: { min: 8, max: 64, step: 4, default: 16, unit: "صفحه", effect: "PAGES", component: "inner" }, values: [] },
@@ -581,8 +474,8 @@ export const PRODUCTS: ProductSeed[] = [
       methodSelection: "CHEAPEST",
     },
     methods: [
-      { methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 100, maxQuantity: 1000 },
-      { methodCode: "OFFSET", workflowTemplateCode: "OFFSET_STANDARD", minQuantity: 500, maxQuantity: null },
+      { methodCode: "DIGITAL", minQuantity: 100, maxQuantity: 1000 },
+      { methodCode: "OFFSET", minQuantity: 500, maxQuantity: null },
     ],
     groups: [
       {
@@ -619,7 +512,7 @@ export const PRODUCTS: ProductSeed[] = [
       baseOperations: [{ code: "PLOTTER_CUTTING" }],
       methodSelection: "PRIORITY",
     },
-    methods: [{ methodCode: "DIGITAL", workflowTemplateCode: "DIGITAL_STANDARD", minQuantity: 50, maxQuantity: null }],
+    methods: [{ methodCode: "DIGITAL", minQuantity: 50, maxQuantity: null }],
     groups: [
       {
         key: "size",
@@ -650,120 +543,135 @@ export const PRODUCTS: ProductSeed[] = [
   },
 ];
 
+
 // ── Roles & people ──────────────────────────────────────────────────────────
 
 const P = (...codes: Permission[]) => codes;
 
-export const ROLES: { code: string; name: string; description: string; workspaces: string[]; stepTypes: string[]; permissions: Permission[] | "ALL" }[] = [
-  { code: "MANAGER", name: "مدیر", description: "دسترسی کامل و مرکز کنترل", workspaces: ["control", "sales", "accounting", "procurement", "warehouse", "studio", "station", "qc", "shipping"], stepTypes: STEP_TYPES.map((s) => s.code), permissions: "ALL" },
-  { code: "SALES", name: "فروش", description: "استعلام، پیش‌فاکتور و ثبت سفارش", workspaces: ["sales"], stepTypes: [], permissions: P("order.view", "order.create", "order.edit", "quote.view", "quote.manage", "customer.view", "customer.manage", "file.view", "file.upload", "production.view", "payment.view", "payment.create", "delivery.view", "pricing.view") },
-  { code: "ACCOUNTANT", name: "حسابدار", description: "پرداخت‌ها، مطالبات و تسویه", workspaces: ["accounting"], stepTypes: [], permissions: P("order.view", "customer.view", "payment.view", "payment.create", "payment.approve", "payment.refund", "report.view") },
-  { code: "PROCUREMENT", name: "تأمین و خرید", description: "درخواست مواد، سفارش خرید و تأمین‌کنندگان", workspaces: ["procurement", "warehouse"], stepTypes: [], permissions: P("inventory.view", "procurement.view", "procurement.manage", "inventory.receive", "order.view") },
-  { code: "WAREHOUSE", name: "انباردار", description: "موجودی، رزرو، دریافت و حواله", workspaces: ["warehouse"], stepTypes: [], permissions: P("inventory.view", "inventory.receive", "inventory.issue", "inventory.reserve", "inventory.waste", "procurement.view") },
-  { code: "DESIGNER", name: "طراح", description: "طراحی و اصلاح فایل مشتری", workspaces: ["studio"], stepTypes: ["DESIGN"], permissions: P("file.view", "file.upload", "production.view", "production.execute", "order.view") },
-  { code: "PREPRESS", name: "پیش از چاپ", description: "بررسی فنی فایل، مونتاژ و RIP", workspaces: ["studio", "station"], stepTypes: ["PREPRESS"], permissions: P("file.view", "file.upload", "file.review", "production.view", "production.execute", "order.view") },
-  { code: "LITHOGRAPHY", name: "لیتوگرافی", description: "زینک‌سازی CTP", workspaces: ["station"], stepTypes: ["PLATE_MAKING"], permissions: P("production.view", "production.execute", "file.view") },
-  { code: "OFFSET_OPERATOR", name: "اپراتور افست", description: "چاپ افست", workspaces: ["station"], stepTypes: ["OFFSET_PRINTING"], permissions: P("production.view", "production.execute", "file.view") },
-  { code: "DIGITAL_OPERATOR", name: "اپراتور دیجیتال", description: "چاپ دیجیتال", workspaces: ["station"], stepTypes: ["DIGITAL_PRINTING", "PLOTTER_CUTTING"], permissions: P("production.view", "production.execute", "file.view") },
-  { code: "CUTTING", name: "برش", description: "برش کاغذ و محصول", workspaces: ["station"], stepTypes: ["PAPER_CUTTING", "CUTTING", "CORNER_ROUNDING"], permissions: P("production.view", "production.execute") },
-  { code: "LAMINATION", name: "سلفون", description: "سلفون و لمینیت", workspaces: ["station"], stepTypes: ["LAMINATION"], permissions: P("production.view", "production.execute") },
-  { code: "UV", name: "UV", description: "پوشش UV", workspaces: ["station"], stepTypes: ["UV_COATING"], permissions: P("production.view", "production.execute") },
-  { code: "FINISHING", name: "عملیات تکمیلی", description: "طلاکوب، برجسته و قالب‌برش", workspaces: ["station"], stepTypes: ["FOIL_STAMPING", "EMBOSSING", "DIE_CUTTING"], permissions: P("production.view", "production.execute") },
-  { code: "BINDING", name: "صحافی", description: "صحافی", workspaces: ["station"], stepTypes: ["BINDING"], permissions: P("production.view", "production.execute") },
-  { code: "PACKAGING", name: "بسته‌بندی", description: "بسته‌بندی", workspaces: ["station"], stepTypes: ["PACKAGING"], permissions: P("production.view", "production.execute") },
-  { code: "QC", name: "کنترل کیفیت", description: "بازرسی کیفیت و تعیین دوباره‌کاری", workspaces: ["qc"], stepTypes: ["QC"], permissions: P("production.view", "qc.perform", "file.view", "order.view") },
-  { code: "SHIPPING", name: "ارسال", description: "آماده‌سازی و تحویل مرسولات", workspaces: ["shipping"], stepTypes: [], permissions: P("order.view", "delivery.view", "delivery.manage", "delivery.execute") },
+/**
+ * Roles follow the real responsibilities. A person can hold several roles;
+ * permissions can be changed from the panel (کارکنان و نقش‌ها).
+ */
+export const ROLES: { code: string; name: string; description: string; permissions: Permission[] }[] = [
+  {
+    code: "MANAGER",
+    name: "مدیر",
+    description: "تأیید سفارش‌ها، تأیید کیفیت افست، انتخاب تأمین‌کننده کاغذ، دید کامل",
+    permissions: P(
+      "dashboard.view", "order.view", "order.create", "order.approve.digital", "order.approve.offset", "order.price", "order.priority", "order.cancel",
+      "artwork.review", "digital.queue", "offset.queue", "offset.paper.approve", "offset.quality",
+      "customer.view", "customer.manage", "payment.view", "payment.record", "invoice.manage",
+      "inventory.manage", "catalog.manage", "employee.manage", "audit.view", "settings.manage",
+    ),
+  },
+  {
+    code: "DIGITAL_MANAGER",
+    name: "مدیر دیجیتال",
+    description: "تأیید سفارش‌های دیجیتال، تولید، کیفیت نهایی، بسته‌بندی و ارسال دیجیتال",
+    permissions: P("order.approve.digital", "order.priority", "artwork.review", "digital.queue", "digital.production", "digital.quality", "digital.dispatch"),
+  },
+  {
+    code: "DIGITAL_OPERATOR",
+    name: "اپراتور دیجیتال",
+    description: "اجرای ایستگاه‌های تولید دیجیتال",
+    permissions: P("digital.queue", "digital.production"),
+  },
+  {
+    code: "ACCOUNTANT",
+    name: "حسابدار",
+    description: "مشتریان، پرداخت‌ها و فاکتورها؛ تأیید سفارش‌های افست",
+    permissions: P("order.view", "order.create", "order.approve.offset", "order.price", "offset.queue", "customer.view", "customer.manage", "payment.view", "payment.record", "invoice.manage"),
+  },
+  {
+    code: "OFFSET_MANAGER",
+    name: "مدیر لیتوگرافی و افست",
+    description: "تأیید سفارش‌های افست، لیتوگرافی، استعلام کاغذ، تعیین ماشین، پس از چاپ و ارسال",
+    permissions: P("order.approve.offset", "order.priority", "artwork.review", "offset.queue", "offset.litho", "offset.paper", "offset.press.assign", "offset.postpress", "offset.shipping", "inventory.manage"),
+  },
+  {
+    code: "OFFSET_PRODUCTION",
+    name: "تولید افست",
+    description: "تعیین ماشین و چاپ افست، پس از چاپ، بسته‌بندی و ارسال",
+    permissions: P("offset.queue", "offset.press.assign", "offset.print", "offset.postpress", "offset.packaging", "offset.shipping"),
+  },
+  {
+    code: "DESIGNER",
+    name: "طراح",
+    description: "طراحی سفارش‌هایی که مشتری طراحی خواسته است",
+    permissions: P("design.work", "artwork.review"),
+  },
 ];
 
+/** Demo phone numbers; the names are the printing house's real staff. */
 export const EMPLOYEES = [
-  { phone: "09120000001", fullName: "مهدی تاجر تاجیک", code: "E001", title: "مدیرعامل", roles: ["MANAGER"], hourlyCost: 0 },
-  { phone: "09120000002", fullName: "سارا محمدی", code: "E002", title: "کارشناس فروش", roles: ["SALES"], hourlyCost: 1_200_000 },
-  { phone: "09120000003", fullName: "رضا کریمی", code: "E003", title: "حسابدار", roles: ["ACCOUNTANT"], hourlyCost: 1_300_000 },
-  { phone: "09120000004", fullName: "علی احمدی", code: "E004", title: "انباردار", roles: ["WAREHOUSE", "PROCUREMENT"], hourlyCost: 1_000_000 },
-  { phone: "09120000005", fullName: "نگار حسینی", code: "E005", title: "طراح گرافیک", roles: ["DESIGNER"], hourlyCost: 1_400_000 },
-  { phone: "09120000006", fullName: "امیر رستمی", code: "E006", title: "کارشناس پیش از چاپ", roles: ["PREPRESS", "LITHOGRAPHY"], hourlyCost: 1_300_000 },
-  { phone: "09120000007", fullName: "حسن مرادی", code: "E007", title: "اپراتور افست", roles: ["OFFSET_OPERATOR"], hourlyCost: 1_200_000 },
-  { phone: "09120000008", fullName: "مریم صادقی", code: "E008", title: "اپراتور دیجیتال", roles: ["DIGITAL_OPERATOR"], hourlyCost: 1_100_000 },
-  { phone: "09120000009", fullName: "جواد نوری", code: "E009", title: "اپراتور برش و سلفون", roles: ["CUTTING", "LAMINATION", "UV"], hourlyCost: 1_000_000 },
-  { phone: "09120000010", fullName: "کاوه یزدانی", code: "E010", title: "صحاف", roles: ["BINDING", "FINISHING", "PACKAGING"], hourlyCost: 950_000 },
-  { phone: "09120000011", fullName: "فاطمه رحمانی", code: "E011", title: "کنترل کیفیت", roles: ["QC"], hourlyCost: 1_100_000 },
-  { phone: "09120000012", fullName: "بهروز قاسمی", code: "E012", title: "مسئول ارسال", roles: ["SHIPPING"], hourlyCost: 900_000 },
-];
+  { key: "hamed", phone: "09120000001", fullName: "حامد نورصالحی", code: "E001", title: "مدیر", roles: ["MANAGER"] },
+  { key: "labafi", phone: "09120000002", fullName: "آقای لبافی", code: "E002", title: "مدیر دیجیتال", roles: ["DIGITAL_MANAGER"] },
+  { key: "azad", phone: "09120000003", fullName: "خانم آزاد", code: "E003", title: "اپراتور دیجیتال", roles: ["DIGITAL_OPERATOR"] },
+  { key: "abdali", phone: "09120000004", fullName: "حسین عبدالی", code: "E004", title: "حسابدار", roles: ["ACCOUNTANT"] },
+  { key: "gholipour", phone: "09120000005", fullName: "آقای قلی‌پور", code: "E005", title: "مدیر لیتوگرافی و افست", roles: ["OFFSET_MANAGER"] },
+  { key: "hajghasemi", phone: "09120000006", fullName: "مجتبی حاج‌قاسمی", code: "E006", title: "مسئول چاپ و تولید افست", roles: ["OFFSET_PRODUCTION"] },
+  { key: "memarian", phone: "09120000007", fullName: "آقای معماریان", code: "E007", title: "مسئول طراحی", roles: ["DESIGNER"] },
+] as const;
 
 /** Demo staff password (DEMO_MODE only; shown on the panel login page). */
 export const DEMO_STAFF_PASSWORD = "honar1405";
 
 export const MACHINES = [
-  { code: "CTP-01", name: "CTP کداک Magnus", typeCode: "CTP", methodCode: "OFFSET", capacityPerHour: 12, setupMinutes: 5, hourlyCost: 2_500_000, operator: "E006" },
-  { code: "OFF-01", name: "هایدلبرگ SM74 چهاررنگ", typeCode: "OFFSET_PRESS", methodCode: "OFFSET", capacityPerHour: 8000, setupMinutes: 40, hourlyCost: 12_000_000, colors: 4, maxW: 740, maxH: 520, operator: "E007" },
-  { code: "OFF-02", name: "کوموری لیتورون ۴۰", typeCode: "OFFSET_PRESS", methodCode: "OFFSET", capacityPerHour: 7000, setupMinutes: 45, hourlyCost: 11_000_000, colors: 4, maxW: 740, maxH: 520, operator: null },
-  { code: "DIG-01", name: "زیراکس Versant 280", typeCode: "DIGITAL_PRESS", methodCode: "DIGITAL", capacityPerHour: 3600, setupMinutes: 10, hourlyCost: 4_000_000, colors: 4, maxW: 480, maxH: 330, operator: "E008" },
-  { code: "DIG-02", name: "کونیکا AccurioPress C4080", typeCode: "DIGITAL_PRESS", methodCode: "DIGITAL", capacityPerHour: 4800, setupMinutes: 10, hourlyCost: 4_500_000, colors: 4, maxW: 480, maxH: 330, operator: null },
-  { code: "GUI-01", name: "گیوتین پولار ۱۱۵", typeCode: "GUILLOTINE", methodCode: null, capacityPerHour: 3000, setupMinutes: 10, hourlyCost: 1_500_000, operator: "E009" },
-  { code: "LAM-01", name: "دستگاه سلفون اتوماتیک", typeCode: "LAMINATOR", methodCode: null, capacityPerHour: 2000, setupMinutes: 15, hourlyCost: 1_800_000, operator: "E009" },
-  { code: "UV-01", name: "دستگاه UV موضعی سیلک", typeCode: "UV_COATER", methodCode: null, capacityPerHour: 1200, setupMinutes: 40, hourlyCost: 2_000_000, operator: "E009" },
-  { code: "FOIL-01", name: "طلاکوب و برجسته حرارتی", typeCode: "FOIL_STAMPER", methodCode: null, capacityPerHour: 2500, setupMinutes: 45, hourlyCost: 2_200_000, operator: "E010" },
-  { code: "DIE-01", name: "قالب‌برش ملخی", typeCode: "DIE_CUTTER", methodCode: null, capacityPerHour: 1500, setupMinutes: 40, hourlyCost: 2_000_000, operator: "E010" },
-  { code: "PLT-01", name: "کاتر پلاتر گرافتک", typeCode: "PLOTTER", methodCode: "DIGITAL", capacityPerHour: 50, setupMinutes: 10, hourlyCost: 1_200_000, operator: "E008" },
-  { code: "BND-01", name: "دستگاه سیمی‌کن", typeCode: "BINDER", methodCode: null, capacityPerHour: 80, setupMinutes: 10, hourlyCost: 900_000, operator: "E010" },
-  { code: "BND-02", name: "ته‌چسب اتوماتیک", typeCode: "BINDER", methodCode: null, capacityPerHour: 250, setupMinutes: 20, hourlyCost: 1_600_000, operator: "E010" },
+  { code: "OFF-1C", name: "ماشین تک‌رنگ GTO", category: "ONE_COLOR" as const },
+  { code: "OFF-4C", name: "هایدلبرگ SM74 چهاررنگ", category: "FOUR_COLOR" as const },
+  { code: "OFF-8C", name: "کوموری لیتریون هشت‌رنگ", category: "EIGHT_COLOR" as const },
+  { code: "DIG-01", name: "زیراکس Versant 280", category: "DIGITAL" as const },
+  { code: "DIG-02", name: "کونیکا AccurioPress C4080", category: "DIGITAL" as const },
 ];
 
+/** Delivery choices offered at checkout; the shipment records what really happened. */
 export const DELIVERY_METHODS = [
-  { code: "PICKUP", name: "تحویل حضوری از چاپخانه", description: "خیابان جمهوری، کوچه چاپخانه، پلاک ۱۲", kind: "PICKUP" as const, providerCode: null, baseFee: 0 },
-  { code: "COURIER", name: "پیک هنر آفاق (تهران)", description: "ارسال با خودروی چاپخانه ظرف ۲۴ ساعت", kind: "INTERNAL" as const, providerCode: null, baseFee: 1_500_000 },
-  { code: "POST", name: "پست پیشتاز", description: "ارسال به سراسر کشور", kind: "EXTERNAL" as const, providerCode: "MANUAL", baseFee: 1_200_000 },
-  { code: "TIPAX", name: "تیپاکس", description: "ارسال سریع بین‌شهری", kind: "EXTERNAL" as const, providerCode: "MANUAL", baseFee: 2_000_000 },
+  { code: "PICKUP", name: "تحویل حضوری از چاپخانه", description: "خیابان جمهوری، کوچه چاپخانه، پلاک ۱۲", method: "PICKUP" as const, baseFee: 0 },
+  { code: "COURIER", name: "پیک هنر آفاق (تهران)", description: "ارسال با پیک چاپخانه ظرف ۲۴ ساعت", method: "COURIER" as const, baseFee: 1_500_000 },
+  { code: "POST", name: "پست پیشتاز", description: "ارسال به سراسر کشور", method: "POST" as const, baseFee: 1_200_000 },
+  { code: "EXTERNAL", name: "باربری / تیپاکس", description: "ارسال سریع بین‌شهری", method: "EXTERNAL" as const, baseFee: 2_000_000 },
+  { code: "CUSTOMER_COURIER", name: "پیک مشتری", description: "پیک خودتان سفارش را تحویل می‌گیرد", method: "CUSTOMER_COURIER" as const, baseFee: 0 },
 ];
 
-export const VEHICLES = [
-  { name: "وانت نیسان سفید", plateNumber: "۲۲ ب ۴۵۶ ایران ۱۰", kind: "VAN" },
-  { name: "موتور پیک", plateNumber: "۱۳۵ - ۷۸۹۱۰", kind: "MOTORCYCLE" },
+type Template = { eventType: string; channel: "SMS" | "IN_APP"; audience: "CUSTOMER" | "STAFF"; permission?: string; title: string; body: string };
+const customer = (eventType: string, title: string, body: string, sms?: string): Template[] => [
+  { eventType, channel: "IN_APP", audience: "CUSTOMER", title, body },
+  ...(sms ? [{ eventType, channel: "SMS" as const, audience: "CUSTOMER" as const, title, body: `هنر آفاق: ${sms}` }] : []),
+];
+/** `{type}` in a permission is replaced by digital/offset from the order. */
+const staff = (eventType: string, permission: string, title: string, body: string): Template => ({ eventType, channel: "IN_APP", audience: "STAFF", permission, title, body });
+
+export const NOTIFICATION_TEMPLATES: Template[] = [
+  ...customer("OrderSubmitted", "سفارش ثبت شد", "سفارش {{orderCode}} ثبت شد و در انتظار تأیید است.", "سفارش {{orderCode}} ثبت شد. پیگیری: {{link}}"),
+  ...customer("OrderApproved", "سفارش تأیید شد", "سفارش {{orderCode}} تأیید شد و به‌زودی آماده‌سازی آن آغاز می‌شود.", "سفارش {{orderCode}} تأیید شد."),
+  ...customer("OrderNeedsInfo", "نیاز به اطلاعات بیشتر", "برای سفارش {{orderCode}} به توضیح بیشتری نیاز داریم: {{note}}", "برای سفارش {{orderCode}} به توضیح بیشتری نیاز داریم. لطفاً به حساب کاربری مراجعه کنید: {{link}}"),
+  ...customer("OrderRejected", "سفارش پذیرفته نشد", "سفارش {{orderCode}} پذیرفته نشد: {{note}}", "متأسفانه سفارش {{orderCode}} پذیرفته نشد. جزئیات: {{link}}"),
+  ...customer("ArtworkNeedsCorrection", "فایل نیاز به اصلاح دارد", "فایل سفارش {{orderCode}} نیاز به اصلاح دارد: {{note}}", "فایل سفارش {{orderCode}} نیاز به اصلاح دارد: {{link}}"),
+  ...customer("OrderPriced", "مبلغ سفارش تعیین شد", "مبلغ سفارش {{orderCode}}: {{amount}}. می‌توانید از حساب کاربری پرداخت کنید."),
+  ...customer("PaymentReceived", "پرداخت موفق", "مبلغ {{amount}} برای سفارش {{orderCode}} دریافت شد.", "مبلغ {{amount}} برای سفارش {{orderCode}} دریافت شد. سپاس از شما."),
+  ...customer("OrderReady", "سفارش آماده است", "سفارش {{orderCode}} آماده شد.", "سفارش {{orderCode}} آماده است."),
+  ...customer("OrderShipped", "سفارش ارسال شد", "سفارش {{orderCode}} ارسال شد. {{trackingText}}", "سفارش {{orderCode}} ارسال شد. {{trackingText}}"),
+  ...customer("OrderDelivered", "سفارش تحویل شد", "سفارش {{orderCode}} تحویل شد. از اعتماد شما سپاسگزاریم.", "سفارش {{orderCode}} تحویل شد. سپاسگزاریم."),
+  staff("OrderSubmitted", "order.approve.{type}", "سفارش جدید در انتظار تأیید", "سفارش {{orderCode}} از {{customerName}} منتظر تأیید شماست."),
+  staff("CustomerReplied", "order.approve.{type}", "پاسخ مشتری", "مشتری برای سفارش {{orderCode}} توضیح فرستاد."),
+  staff("ArtworkUploaded", "artwork.review", "فایل جدید برای بررسی", "فایل جدیدی برای سفارش {{orderCode}} بارگذاری شد."),
+  staff("DesignAssigned", "design.work", "طراحی جدید", "طراحی سفارش {{orderCode}} به شما سپرده شد."),
+  staff("QualityCheckNeeded", "{type}.quality", "در انتظار تأیید کیفیت", "سفارش {{orderCode}} منتظر تأیید کیفیت ({{stepName}}) است."),
+  staff("PaperDecisionNeeded", "offset.paper.approve", "انتخاب تأمین‌کننده کاغذ", "قیمت‌های کاغذ سفارش {{orderCode}} ثبت شد و منتظر انتخاب شماست."),
+  staff("PaymentAwaitingApproval", "payment.record", "پرداخت در انتظار تأیید", "یک پرداخت برای سفارش {{orderCode}} منتظر تأیید است."),
 ];
 
-export const QC_DEFECT_TYPES = [
-  { code: "COLOR", name: "اختلاف رنگ" },
-  { code: "REGISTER", name: "خطای رجیستر" },
-  { code: "SMUDGE", name: "لکه و کثیفی" },
-  { code: "CUT", name: "خطای برش" },
-  { code: "LAMINATION", name: "حباب یا چروک سلفون" },
-  { code: "BINDING", name: "ایراد صحافی" },
-  { code: "COUNT", name: "کسری تعداد" },
-  { code: "OTHER", name: "سایر" },
-].map((d, i) => ({ ...d, sortOrder: i }));
-
-export const NOTIFICATION_TEMPLATES = [
-  { eventType: "OrderPlaced", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "ثبت سفارش", body: "هنر آفاق: سفارش {{orderNumber}} ثبت شد. پیگیری: {{link}}" },
-  { eventType: "OrderConfirmed", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "تأیید سفارش", body: "هنر آفاق: سفارش {{orderNumber}} تأیید شد و وارد برنامه تولید شد." },
-  { eventType: "ProofSent", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "نمونه طرح آماده تأیید است", body: "هنر آفاق: نمونه طرح سفارش {{orderNumber}} آماده است. لطفاً بررسی و تأیید کنید: {{link}}" },
-  { eventType: "PaymentReceived", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "دریافت پرداخت", body: "هنر آفاق: مبلغ {{amount}} برای سفارش {{orderNumber}} دریافت شد. سپاس از شما." },
-  { eventType: "ProductionStarted", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "شروع تولید", body: "هنر آفاق: تولید سفارش {{orderNumber}} آغاز شد." },
-  { eventType: "OrderReady", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "سفارش آماده است", body: "هنر آفاق: سفارش {{orderNumber}} آماده تحویل است." },
-  { eventType: "DeliveryDispatched", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "ارسال سفارش", body: "هنر آفاق: سفارش {{orderNumber}} ارسال شد. {{trackingText}}" },
-  { eventType: "DeliveryCompleted", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "تحویل سفارش", body: "هنر آفاق: سفارش {{orderNumber}} تحویل شد. از اعتماد شما سپاسگزاریم." },
-  { eventType: "QuoteSent", channel: "SMS" as const, audience: "CUSTOMER" as const, title: "پیش‌فاکتور جدید", body: "هنر آفاق: پیش‌فاکتور {{quoteNumber}} برای شما صادر شد: {{link}}" },
-  // In-app notifications shown in the customer's account (bell in the store header).
-  { eventType: "OrderPlaced", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "سفارش ثبت شد", body: "سفارش {{orderNumber}} ثبت شد و در صف بررسی قرار گرفت." },
-  { eventType: "OrderConfirmed", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "سفارش تأیید شد", body: "سفارش {{orderNumber}} تأیید شد و وارد برنامه تولید شد." },
-  { eventType: "PaymentReceived", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "پرداخت موفق", body: "مبلغ {{amount}} برای سفارش {{orderNumber}} دریافت شد." },
-  { eventType: "ProofSent", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "نمونه طرح آماده تأیید است", body: "نمونه طرح سفارش {{orderNumber}} آماده است؛ لطفاً بررسی و تأیید کنید." },
-  { eventType: "ProductionStarted", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "تولید آغاز شد", body: "تولید سفارش {{orderNumber}} آغاز شد." },
-  { eventType: "OrderReady", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "تولید تکمیل شد — سفارش آماده است", body: "سفارش {{orderNumber}} آماده تحویل است." },
-  { eventType: "DeliveryAssigned", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "ارسال برنامه‌ریزی شد", body: "مرسوله سفارش {{orderNumber}} به مسئول ارسال سپرده شد." },
-  { eventType: "DeliveryDispatched", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "سفارش در مسیر است", body: "سفارش {{orderNumber}} ارسال شد. {{trackingText}}" },
-  { eventType: "DeliveryCompleted", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "سفارش تحویل شد", body: "سفارش {{orderNumber}} تحویل شد. از اعتماد شما سپاسگزاریم." },
-  { eventType: "QuoteSent", channel: "IN_APP" as const, audience: "CUSTOMER" as const, title: "پیش‌فاکتور جدید", body: "پیش‌فاکتور {{quoteNumber}} برای شما صادر شد." },
-  { eventType: "OrderPlaced", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "SALES", title: "سفارش جدید", body: "سفارش {{orderNumber}} از {{customerName}} ثبت شد." },
-  { eventType: "InquiryReceived", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "SALES", title: "استعلام جدید", body: "استعلام {{inquiryNumber}} از {{customerName}} دریافت شد." },
-  { eventType: "PaymentAwaitingApproval", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "ACCOUNTANT", title: "پرداخت در انتظار تأیید", body: "یک پرداخت برای سفارش {{orderNumber}} منتظر تأیید است." },
-  { eventType: "MaterialShortage", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "PROCUREMENT", title: "کمبود مواد", body: "کمبود {{materialName}} برای سفارش {{orderNumber}} — درخواست تأمین ثبت شد." },
-  { eventType: "StockLow", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "PROCUREMENT", title: "موجودی زیر نقطه سفارش", body: "موجودی {{materialName}} به زیر نقطه سفارش رسید." },
-  { eventType: "QcFailed", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "MANAGER", title: "رد در کنترل کیفیت", body: "سفارش {{orderNumber}} در کنترل کیفیت رد شد و به دوباره‌کاری رفت." },
-  { eventType: "IssueReported", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "MANAGER", title: "گزارش مشکل تولید", body: "مشکل در مرحله «{{taskName}}» سفارش {{orderNumber}}: {{description}}" },
-  { eventType: "OrderReady", channel: "IN_APP" as const, audience: "ROLE" as const, roleCode: "SHIPPING", title: "سفارش آماده ارسال", body: "سفارش {{orderNumber}} بسته‌بندی شد و آماده ارسال است." },
-];
-
+/** Seller information on invoices is configurable (تنظیمات). */
 export const DEFAULT_SETTINGS = {
-  business: { name: "چاپخانه هنر آفاق", phone: "021-33912000", address: "تهران، خیابان جمهوری، کوچه چاپخانه، پلاک ۱۲", workdays: [6, 0, 1, 2, 3], thursdayHalf: true, workStart: "08:00", workEnd: "17:00" },
-  orders: { defaultDepositPct: 50, quoteValidityDays: 7, autoConfirmPaidWebOrders: true },
+  business: {
+    name: "چاپخانه هنر آفاق",
+    legalName: "شرکت چاپ و نشر هنر آفاق",
+    phone: "021-33912000",
+    address: "تهران، خیابان جمهوری، کوچه چاپخانه، پلاک ۱۲",
+    postalCode: "1131733561",
+    economicCode: "411111111111",
+    nationalId: "10101234567",
+    registrationNo: "123456",
+  },
+  invoice: { vatPct: 10, paymentTerms: "تسویه کامل پیش از تحویل سفارش", officialNote: "این فاکتور بدون مهر و امضای فروشنده فاقد اعتبار است." },
 };

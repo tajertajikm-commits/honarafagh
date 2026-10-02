@@ -1,24 +1,10 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import {
-  customers,
-  employeeRoles,
-  employees,
-  inquiries,
-  materials,
-  notificationTemplates,
-  notifications,
-  orders,
-  productionIssues,
-  productionTasks,
-  quotes,
-  roles,
-  shipments,
-  users,
-} from "@/server/db/schema";
+import { customers, employeeRoles, employees, notificationTemplates, notifications, orders, rolePermissions, shipments, users } from "@/server/db/schema";
 import { env } from "@/server/config/env";
 import type { Ctx } from "@/server/core/context";
 import { smsProvider } from "@/server/integrations/sms";
-import { formatToman, toFaDigits } from "@/lib/persian";
+import { station } from "@/server/modules/workflow/stations";
+import { formatToman } from "@/lib/persian";
 
 type OutboxRow = { id: number; type: string; payload: Record<string, unknown> };
 
@@ -31,85 +17,52 @@ export function renderTemplate(tpl: string, vars: Record<string, string | number
 
 /** Loads the values templates may reference for an event. */
 async function variablesFor(ctx: Ctx, e: OutboxRow) {
-  const p = e.payload as Record<string, string | number | undefined>;
+  const p = e.payload as Record<string, string | number | null | undefined>;
   const vars: Record<string, string | number | null> = {};
   let customer: { id: string; phone: string; fullName: string; userId: string | null } | null = null;
-  const base = env().APP_URL;
+  let order: { id: string; type: "DIGITAL" | "OFFSET"; designerId: string | null } | null = null;
   if (p.orderId) {
     const [o] = await ctx.db
-      .select({ number: orders.number, customerId: orders.customerId, phone: customers.phone, fullName: customers.fullName, userId: customers.userId, customerRowId: customers.id })
+      .select({ code: orders.code, total: orders.total, type: orders.productionType, designerId: orders.designerId, customerId: orders.customerId, phone: customers.phone, fullName: customers.fullName, userId: customers.userId })
       .from(orders)
       .innerJoin(customers, eq(customers.id, orders.customerId))
       .where(eq(orders.id, String(p.orderId)));
     if (o) {
-      vars.orderNumber = toFaDigits(o.number);
+      vars.orderCode = o.code;
       vars.customerName = o.fullName || "مشتری";
-      vars.link = `${base}/account/orders/${p.orderId}`;
-      customer = { id: o.customerRowId, phone: o.phone, fullName: o.fullName, userId: o.userId };
+      vars.link = `${env().APP_URL.replace(/\/+$/, "")}/account/orders/${p.orderId}`;
+      if (e.type === "OrderPriced") vars.amount = formatToman(o.total);
+      customer = { id: o.customerId, phone: o.phone, fullName: o.fullName, userId: o.userId };
+      order = { id: String(p.orderId), type: o.type, designerId: o.designerId };
+      if (e.type === "OrderShipped") {
+        const [s] = await ctx.db.select({ trackingCode: shipments.trackingCode }).from(shipments).where(eq(shipments.orderId, String(p.orderId)));
+        vars.trackingText = s?.trackingCode ? `کد رهگیری: ${s.trackingCode}` : "";
+      }
     }
   }
-  if (p.amount != null) vars.amount = formatToman(Number(p.amount));
-  if (p.shipmentId) {
-    const [s] = await ctx.db.select({ trackingCode: shipments.trackingCode, provider: shipments.externalProvider }).from(shipments).where(eq(shipments.id, String(p.shipmentId)));
-    vars.trackingText = s?.trackingCode ? `کد رهگیری: ${s.trackingCode}` : "";
-  }
-  if (p.materialId) {
-    const [m] = await ctx.db.select({ name: materials.name }).from(materials).where(eq(materials.id, String(p.materialId)));
-    vars.materialName = m?.name ?? "";
-  }
-  if (p.issueId) {
-    const [i] = await ctx.db
-      .select({ description: productionIssues.description, taskName: productionTasks.name })
-      .from(productionIssues)
-      .innerJoin(productionTasks, eq(productionTasks.id, productionIssues.taskId))
-      .where(eq(productionIssues.id, String(p.issueId)));
-    vars.description = i?.description ?? "";
-    vars.taskName = i?.taskName ?? "";
-  }
-  if (p.quoteId) {
-    const [q] = await ctx.db
-      .select({ number: quotes.number, phone: customers.phone, fullName: customers.fullName, userId: customers.userId, customerId: customers.id })
-      .from(quotes)
-      .innerJoin(customers, eq(customers.id, quotes.customerId))
-      .where(eq(quotes.id, String(p.quoteId)));
-    if (q) {
-      vars.quoteNumber = toFaDigits(q.number);
-      vars.link = `${base}/account/quotes/${p.quoteId}`;
-      customer = { id: q.customerId, phone: q.phone, fullName: q.fullName, userId: q.userId };
-    }
-  }
-  if (p.inquiryId) {
-    const [iq] = await ctx.db
-      .select({ number: inquiries.number, fullName: customers.fullName })
-      .from(inquiries)
-      .innerJoin(customers, eq(customers.id, inquiries.customerId))
-      .where(eq(inquiries.id, String(p.inquiryId)));
-    vars.inquiryNumber = iq ? toFaDigits(iq.number) : "";
-    vars.customerName = iq?.fullName ?? "";
-  }
-  return { vars, customer };
+  if (p.amount != null && e.type !== "OrderPriced") vars.amount = formatToman(Number(p.amount));
+  if (p.note != null) vars.note = String(p.note);
+  if (p.stepKey) vars.stepName = station(String(p.stepKey)).name;
+  return { vars, customer, order };
 }
 
-async function staffWithRole(ctx: Ctx, roleCode: string) {
+/** Active staff holding a permission. */
+export async function staffWithPermission(ctx: Ctx, permission: string) {
   const rows = await ctx.db
     .selectDistinct({ userId: employees.userId })
     .from(employeeRoles)
-    .innerJoin(roles, eq(roles.id, employeeRoles.roleId))
+    .innerJoin(rolePermissions, eq(rolePermissions.roleId, employeeRoles.roleId))
     .innerJoin(employees, eq(employees.id, employeeRoles.employeeId))
     .innerJoin(users, eq(users.id, employees.userId))
-    .where(and(inArray(roles.code, [roleCode, "MANAGER"]), eq(employees.isActive, true), eq(users.isActive, true)));
+    .where(and(eq(rolePermissions.permission, permission), eq(employees.isActive, true), eq(users.isActive, true)));
   return rows.map((r) => r.userId);
 }
-
-const dayKey = () => new Date().toISOString().slice(0, 10);
 
 /** Outbox handler: turns a domain event into SMS / in-app notifications per templates. */
 export async function dispatchNotifications(ctx: Ctx, e: OutboxRow) {
   const templates = await ctx.db.select().from(notificationTemplates).where(and(eq(notificationTemplates.eventType, e.type), eq(notificationTemplates.isActive, true)));
   if (templates.length === 0) return;
-  const { vars, customer } = await variablesFor(ctx, e);
-  // Stock alerts are re-emitted on every movement below the reorder point: one per material per day.
-  const dedupeScope = e.type === "StockLow" ? `StockLow:${String(e.payload.materialId)}:${dayKey()}` : String(e.id);
+  const { vars, customer, order } = await variablesFor(ctx, e);
 
   for (const t of templates) {
     const body = renderTemplate(t.body, vars);
@@ -117,7 +70,7 @@ export async function dispatchNotifications(ctx: Ctx, e: OutboxRow) {
     if (t.audience === "CUSTOMER") {
       if (!customer) continue;
       if (t.channel === "SMS") {
-        const key = `${dedupeScope}:SMS:${customer.phone}`;
+        const key = `${e.id}:SMS:${customer.phone}`;
         const [n] = await ctx.db
           .insert(notifications)
           .values({ phone: customer.phone, userId: customer.userId, channel: "SMS", eventType: e.type, title, body, dedupeKey: key, outboxEventId: e.id })
@@ -132,18 +85,22 @@ export async function dispatchNotifications(ctx: Ctx, e: OutboxRow) {
         }
       } else if (t.channel === "IN_APP" && customer.userId) {
         // In-app links are app-relative (SMS bodies carry the absolute URL).
-        const link = e.payload.orderId ? `/account/orders/${String(e.payload.orderId)}` : e.payload.quoteId ? `/account/quotes/${String(e.payload.quoteId)}` : "/account";
+        const link = order ? `/account/orders/${order.id}` : "/account";
         await ctx.db
           .insert(notifications)
-          .values({ userId: customer.userId, channel: "IN_APP", eventType: e.type, title, body, link, status: "SENT", sentAt: new Date(), dedupeKey: `${dedupeScope}:IN_APP:${customer.userId}`, outboxEventId: e.id })
+          .values({ userId: customer.userId, channel: "IN_APP", eventType: e.type, title, body, link, status: "SENT", sentAt: new Date(), dedupeKey: `${e.id}:IN_APP:${customer.userId}`, outboxEventId: e.id })
           .onConflictDoNothing();
       }
-    } else if (t.audience === "ROLE" && t.roleCode && t.channel === "IN_APP") {
-      const link = e.payload.orderId ? `/panel/orders/${String(e.payload.orderId)}` : e.payload.materialId ? `/panel/warehouse` : e.payload.inquiryId ? `/panel/sales` : null;
-      for (const userId of await staffWithRole(ctx, t.roleCode)) {
+    } else if (t.audience === "STAFF" && t.permission && t.channel === "IN_APP") {
+      const permission = t.permission.replace("{type}", (order?.type ?? "DIGITAL").toLowerCase());
+      let recipients = await staffWithPermission(ctx, permission);
+      // Design work goes to the assigned designer when there is one.
+      if (e.type === "DesignAssigned" && e.payload.designerUserId) recipients = [String(e.payload.designerUserId)];
+      const link = order ? `/panel/orders/${order.id}` : "/panel";
+      for (const userId of recipients) {
         await ctx.db
           .insert(notifications)
-          .values({ userId, channel: "IN_APP", eventType: e.type, title, body, link, status: "SENT", sentAt: new Date(), dedupeKey: `${dedupeScope}:IN_APP:${userId}:${t.id}`, outboxEventId: e.id })
+          .values({ userId, channel: "IN_APP", eventType: e.type, title, body, link, status: "SENT", sentAt: new Date(), dedupeKey: `${e.id}:IN_APP:${userId}:${t.id}`, outboxEventId: e.id })
           .onConflictDoNothing();
       }
     }
