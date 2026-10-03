@@ -9,6 +9,19 @@ database, Node.js, cron, Redis, Docker or API keys.
 > ([setup.md](setup.md)). The demo reuses the production code as it is: nothing was
 > removed or simplified to make it.
 
+
+## Shared data on PHP hosts
+
+`demo/sync.php` (copied into the export) turns the demo into a shared one when the host runs PHP:
+
+- Each tab runs the app on an in-memory PGlite: seed snapshot plus every change in the shared log.
+- Writes are captured row by row by triggers (`demo/runtime/sync-sql.ts`) and pushed right after each request (`demo/runtime/sync.ts`).
+- Other tabs pull every 3 seconds and re-render, but never while someone is typing or has a dialog open.
+- The PHP side is an append-only log with optimistic concurrency (`base` must equal `head`, otherwise 409 → pull, then push again).
+- Sessions are per tab (sessionStorage), so different users can work side by side in one browser.
+- "Reset demo" clears the shared log for everyone.
+- Without PHP the endpoint is missing and the demo falls back to the per-browser mode described below.
+
 ## Download
 
 `demo-dist/printing-house-demo.zip` in this repository (about 15 MB):

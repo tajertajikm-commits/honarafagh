@@ -9,11 +9,10 @@ import { createDispatcher } from "@/server/http/router";
 import { drainOutbox } from "@/server/events/worker";
 import { demoReady, flushDb } from "./boot";
 import { allCookies, BASE_PATH, deleteCookie, readCookie, writeCookie } from "./cookies";
+import { enqueue } from "./queue";
+import { afterWrite, beforeWrite } from "./sync";
 
 const dispatcher = createDispatcher(ROUTES);
-
-/** Serialise requests: one PGlite connection, and handlers assume request isolation. */
-let queue: Promise<unknown> = Promise.resolve();
 
 export function isApiUrl(url: URL): boolean {
   if (url.origin !== window.location.origin) return false;
@@ -31,6 +30,8 @@ export async function demoApi(input: { url: URL; method: string; headers?: Heade
     const headers = new Headers(input.headers);
     headers.set("user-agent", navigator.userAgent);
     const body = input.body ?? null;
+    const writes = input.method.toUpperCase() !== "GET" || input.url.pathname.includes("/callback/");
+    if (writes) await beforeWrite(); // shared demo: start from what others wrote
     const req = {
       method: input.method.toUpperCase(),
       url: input.url.toString(),
@@ -53,15 +54,14 @@ export async function demoApi(input: { url: URL; method: string; headers?: Heade
     // What the worker process does in production: deliver notifications / accounting events
     // right after the request, inside the queue so it never interleaves with another request.
     // Of the GET routes only the gateway callbacks write.
-    if (req.method !== "GET" || input.url.pathname.includes("/callback/")) {
+    if (writes) {
       await drainOutbox(10).catch((err) => console.error("[demo] outbox", err));
       await flushDb();
+      await afterWrite(); // shared demo: send the changed rows to everyone
     }
     return res;
   };
-  const p = queue.then(run, run);
-  queue = p.catch(() => {});
-  return p;
+  return enqueue(run);
 }
 
 /** Session cookies set by the real handlers (NextResponse.cookies) → document.cookie. */

@@ -19,3 +19,8 @@ export function useDemoTick() {
     () => 0,
   );
 }
+
+/** Counts router.push/replace calls: a page that was navigated away from must not redirect any more. */
+let navSeq = 0;
+export const bumpNav = () => ++navSeq;
+export const currentNav = () => navSeq;

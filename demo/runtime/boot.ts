@@ -10,7 +10,9 @@
  *   close their database handle first (IndexedDB file images are not merged).
  */
 import type { PGlite } from "@electric-sql/pglite";
-import { BASE_PATH, deleteCookie } from "./cookies";
+import { BASE_PATH, clearTabCookies, deleteCookie, setTabCookies } from "./cookies";
+import { demoRefresh } from "./refresh";
+import { isShared, probeShared, resetShared, startShared, type RemoteState } from "./sync";
 
 const VERSION = process.env.NEXT_PUBLIC_DEMO_VERSION ?? "dev";
 const DB_NAME = `honar-demo-${VERSION}`;
@@ -87,6 +89,10 @@ async function claimTab() {
 }
 
 async function init() {
+  // A PHP host serves demo/sync.php: everyone who opens the link shares the same data.
+  const remote = await probeShared();
+  setTabCookies(!!remote);
+  if (remote) return initShared(remote);
   await claimTab();
   const [{ PGlite }, { drizzle }, schema] = await Promise.all([import("@electric-sql/pglite"), import("drizzle-orm/pglite"), import("@/server/db/schema")]);
   const dataDir = `idb://${DB_NAME}`;
@@ -98,7 +104,7 @@ async function init() {
     const blob = await res.blob();
     setStage("prepare");
     pg = await PGlite.create({ dataDir, loadDataDir: blob });
-    await shiftSeedToNow(pg);
+    await shiftSeedTo(pg, Date.now());
     await flushDb();
     localStorage.setItem(FLAG, "1");
   } else {
@@ -107,6 +113,50 @@ async function init() {
   }
   (globalThis as { __honarDb?: unknown }).__honarDb = drizzle({ client: pg, schema, casing: "snake_case" });
   setStage("ready");
+}
+
+/**
+ * Shared mode: this tab's database lives in memory, rebuilt on load from the
+ * seed snapshot plus the shared change log (the log is the source of truth).
+ * Several tabs (and devices) work side by side, each with its own sign-in.
+ */
+async function initShared(remote: RemoteState) {
+  const [{ PGlite }, { drizzle }, schema] = await Promise.all([import("@electric-sql/pglite"), import("drizzle-orm/pglite"), import("@/server/db/schema")]);
+  setStage("download");
+  const res = await fetch(`${BASE_PATH}/demo/seed.tgz`, { cache: "force-cache" });
+  if (!res.ok) throw new Error(`seed snapshot not found (${res.status})`);
+  const blob = await res.blob();
+  setStage("prepare");
+  pg = await PGlite.create({ loadDataDir: blob });
+  await shiftSeedTo(pg, remote.epoch); // same shift in every tab: identical starting data everywhere
+  (globalThis as { __honarDb?: unknown }).__honarDb = drizzle({ client: pg, schema, casing: "snake_case" });
+  await startShared({
+    db: pg,
+    remote,
+    onReset: () => {
+      clearTabCookies();
+      window.location.assign(new URL(`${BASE_PATH}/`, window.location.origin));
+    },
+    onChange: scheduleRefresh,
+  });
+  setStage("ready");
+}
+
+/** Re-render with others' changes, but never under someone typing or in an open dialog. */
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleRefresh() {
+  if (refreshTimer) return;
+  const attempt = () => {
+    const el = document.activeElement;
+    const busy = (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) || document.querySelector('[role="dialog"]');
+    if (busy) {
+      refreshTimer = setTimeout(attempt, 1500);
+      return;
+    }
+    refreshTimer = null;
+    demoRefresh();
+  };
+  refreshTimer = setTimeout(attempt, 50);
 }
 
 /**
@@ -122,11 +172,11 @@ export async function flushDb() {
   await (db as unknown as { fs?: { syncToFs(relaxed?: boolean): Promise<void> } }).fs?.syncToFs(false);
 }
 
-/** Moves every timestamp so the snapshot's "now" becomes the visitor's now. */
-async function shiftSeedToNow(db: PGlite) {
+/** Moves every timestamp so the snapshot's "now" becomes `target` (the visitor's now, or the shared epoch). */
+async function shiftSeedTo(db: PGlite, target: number) {
   const meta = await db.query<{ value: string }>(`SELECT value FROM demo_meta WHERE key = 'seeded_at'`);
   const seededAt = meta.rows[0] ? new Date(meta.rows[0].value).getTime() : Date.now();
-  const secs = Math.round((Date.now() - seededAt) / 1000);
+  const secs = Math.round((target - seededAt) / 1000);
   if (Math.abs(secs) < 60) return;
   const cols = await db.query<{ table_name: string; column_name: string }>(
     `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND data_type = 'timestamp with time zone' ORDER BY table_name`,
@@ -136,7 +186,7 @@ async function shiftSeedToNow(db: PGlite) {
   const stmts = ["SET session_replication_role = replica"]; // append-only triggers stay out of the way
   for (const [t, cs] of byTable) stmts.push(`UPDATE "${t}" SET ${cs.map((c) => `"${c}" = "${c}" + make_interval(secs => ${secs})`).join(", ")}`);
   stmts.push("SET session_replication_role = origin");
-  stmts.push(`UPDATE demo_meta SET value = '${new Date().toISOString()}' WHERE key = 'seeded_at'`);
+  stmts.push(`UPDATE demo_meta SET value = '${new Date(target).toISOString()}' WHERE key = 'seeded_at'`);
   await db.exec(stmts.join(";\n"));
 }
 
@@ -162,6 +212,12 @@ async function dropDatabases() {
 
 /** "Reset demo": wipe browser data and reload into a fresh copy of the snapshot. */
 export async function resetDemo() {
+  if (isShared()) {
+    await resetShared(); // for everyone: the shared log starts again from the seed
+    clearTabCookies();
+    window.location.assign(new URL(`${BASE_PATH}/`, window.location.origin));
+    return;
+  }
   channel?.postMessage({ type: "claim", from: tabId });
   if (pg) await pg.close().catch(() => {});
   pg = null;

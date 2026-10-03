@@ -12,7 +12,7 @@
 import { createContext, createElement, isValidElement, Fragment, Suspense, useContext, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { demoReady } from "./boot";
-import { useDemoTick } from "./refresh";
+import { currentNav, useDemoTick } from "./refresh";
 import { DYNAMIC_PARAM, toDemoPath } from "./routes";
 
 type AnyComponent = (props: Record<string, unknown>) => unknown;
@@ -55,8 +55,13 @@ function useLoader(run: () => Promise<unknown>, key: string) {
   const router = useRouter();
   const tick = useDemoTick();
   const [state, setState] = useState<State>({ kind: "loading" });
+  // The navigation count when this page (route key) was shown: once the app navigates on, this page's redirects are stale.
+  const [navMark, setNavMark] = useState(() => ({ key, nav: currentNav() }));
+  if (navMark.key !== key) setNavMark({ key, nav: currentNav() });
+  const navAtShow = navMark.key === key ? navMark.nav : currentNav();
   useEffect(() => {
     let cancelled = false;
+    const startedAt = window.location.href;
     (async () => {
       try {
         await demoReady();
@@ -66,6 +71,8 @@ function useLoader(run: () => Promise<unknown>, key: string) {
         if (cancelled) return;
         const digest = digestOf(err);
         if (digest?.startsWith("NEXT_REDIRECT")) {
+          // A render that started before the user navigated away must not redirect them back.
+          if (window.location.href !== startedAt || currentNav() !== navAtShow) return;
           const [, type, url] = digest.split(";");
           const href = toDemoPath(url!);
           if (type === "push") router.push(href);

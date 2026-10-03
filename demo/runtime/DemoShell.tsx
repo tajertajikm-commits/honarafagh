@@ -18,6 +18,7 @@ import { api, ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { formatPhone, toFaDigits } from "@/lib/persian";
 import { type BootStage, demoReady, onBootStage, resetDemo } from "./boot";
+import { isShared } from "./sync";
 import { BASE_PATH, readCookie } from "./cookies";
 import { installInterceptors } from "./interceptors";
 import { demoRefresh } from "./refresh";
@@ -196,7 +197,12 @@ function DemoPanel() {
               <button className="grid size-8 place-items-center rounded-md hover:bg-surface-2" onClick={() => setOpen(false)} aria-label="بستن"><X className="size-4" /></button>
             </div>
             <div className="space-y-5 px-5 py-4 text-[13px]">
-              <p className="leading-6 text-muted">این نسخه نمایشی کاملاً در مرورگر اجرا می‌شود. داده‌ها فقط در همین مرورگر ذخیره می‌شوند؛ پیامک، درگاه بانکی و حسابداری واقعی متصل نیستند.</p>
+              {isShared() ? (
+                <p className="rounded-lg bg-success-soft px-3 py-2 leading-6 text-success">داده‌ها بین همه مشترک است: هر کس این لینک را باز کند (هر دستگاه یا هر تب) همین سفارش‌ها را می‌بیند. هر تب ورود جداگانه دارد؛ مثلاً مشتری در یک تب و مدیر در تب دیگر.</p>
+              ) : (
+                <p className="leading-6 text-muted">این نسخه نمایشی کاملاً در مرورگر اجرا می‌شود و داده‌ها فقط در همین مرورگر ذخیره می‌شوند.</p>
+              )}
+              <p className="leading-6 text-muted">پیامک، درگاه بانکی و حسابداری واقعی متصل نیستند.</p>
               <div className="flex flex-wrap gap-2">
                 <button className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 font-bold hover:bg-surface-2" onClick={() => go("/")}><Store className="size-4" /> فروشگاه</button>
                 <button className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 font-bold hover:bg-surface-2" onClick={() => go("/account/")}><UserRound className="size-4" /> حساب مشتری</button>
@@ -258,7 +264,7 @@ function DemoPanel() {
                 <button
                   className="flex h-9 items-center gap-1.5 rounded-lg bg-danger px-3 font-bold text-white hover:brightness-110"
                   onClick={() => {
-                    if (window.confirm("همه داده‌های این دمو (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟")) void resetDemo();
+                    if (window.confirm(isShared() ? "همه داده‌های دمو برای همه کاربران (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟" : "همه داده‌های این دمو (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟")) void resetDemo();
                   }}
                 >
                   <RotateCcw className="size-4" /> بازنشانی دمو

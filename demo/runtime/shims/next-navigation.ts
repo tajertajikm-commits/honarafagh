@@ -5,7 +5,7 @@
  */
 import { useMemo } from "react";
 import * as nav from "next/dist/client/components/navigation";
-import { demoRefresh } from "../refresh";
+import { bumpNav, demoRefresh } from "../refresh";
 import { toDemoPath } from "../routes";
 
 export const {
@@ -30,8 +30,8 @@ export function useRouter() {
   return useMemo(
     () => ({
       ...r,
-      push: (href: string, opts?: Parameters<typeof r.push>[1]) => r.push(toDemoPath(href), opts),
-      replace: (href: string, opts?: Parameters<typeof r.replace>[1]) => r.replace(toDemoPath(href), opts),
+      push: (href: string, opts?: Parameters<typeof r.push>[1]) => (bumpNav(), r.push(toDemoPath(href), opts)),
+      replace: (href: string, opts?: Parameters<typeof r.replace>[1]) => (bumpNav(), r.replace(toDemoPath(href), opts)),
       prefetch: (href: string, opts?: Parameters<typeof r.prefetch>[1]) => r.prefetch(toDemoPath(href), opts),
       refresh: () => demoRefresh(),
     }),

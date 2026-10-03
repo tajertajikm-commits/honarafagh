@@ -1,29 +1,32 @@
-HONAR AFAGH — STATIC DEMO (نسخه نمایشی)
-========================================
+HONAR AFAGH — DEMO (نسخه نمایشی)
+================================
 
 Built for the folder:  {{BASE}}/
 
-DEPLOY (cPanel)
-  1. Create the folder public_html{{BASE}}/
-  2. Upload printing-house-demo.zip into it and choose "Extract".
-     index.html must end up directly inside public_html{{BASE}}/
-  3. Open https://YOUR-DOMAIN{{BASE}}/
+نصب (cPanel) — فقط Extract
+  1. پوشه public_html{{BASE}}/ را بسازید (اگر هست، محتوای قبلی‌اش را پاک کنید).
+  2. printing-house-demo.zip را داخل همین پوشه آپلود و Extract کنید.
+     فایل index.html باید مستقیم داخل public_html{{BASE}}/ باشد.
+  3. https://YOUR-DOMAIN{{BASE}}/ را باز کنید.
+  پایگاه داده، Node.js، تنظیمات یا کلید API لازم نیست.
 
-No database, no Node.js, no cron and no API keys are needed.
-Everything runs in the visitor's browser (PostgreSQL compiled to
-WebAssembly, stored in the browser's IndexedDB).
+داده مشترک بین همه
+  روی هاست‌های دارای PHP (تقریباً همه هاست‌های cPanel) داده‌ها خودکار بین همه مشترک است:
+  کارفرما روی گوشی خودش حساب می‌سازد و سفارش ثبت می‌کند، مدیر چند ثانیه بعد آن را در پنل
+  می‌بیند و صفحه هر کس خودکار به‌روز می‌شود. هر تب مرورگر ورود جداگانه دارد؛ مثلاً مشتری در
+  یک تب، لبافی در تب دوم و حامد در تب سوم.
+  (فایل demo/sync.php این کار را انجام می‌دهد و داده‌ها را در demo/sync-data نگه می‌دارد.)
+  اگر هاست PHP نداشته باشد، دمو باز هم کار می‌کند ولی داده‌ها فقط در همان مرورگر است.
+  در «پنل حالت نمایشی» (دکمه پایین صفحه) نوشته می‌شود کدام حالت فعال است.
 
-LOGIN
-  Customer:  Store → "ورود" → any mobile number → the demo OTP is shown on
-             screen (new code per request, 2 min validity, 5 attempts,
-             resend after 1 min).
-  Staff:     /panel/login → mobile 09120000001 … 09120000012,
-             password honar1405  (or use the DEMO MODE button, bottom-left).
+ورود
+  مشتری:  فروشگاه → «ورود» → هر شماره موبایل؛ کد تأیید روی صفحه نمایش داده می‌شود.
+  کارکنان: {{BASE}}/panel/login → روی اسم هر نفر بزنید (رمز همه honar1405)،
+           یا از دکمه «پنل حالت نمایشی».
 
-RESET
-  DEMO MODE button → "بازنشانی دمو". Restores all sample data.
+بازنشانی
+  «پنل حالت نمایشی» → «بازنشانی دمو»: داده‌های نمونه اولیه برای همه برمی‌گردد.
 
-NOTES
-  * Data is per browser: other visitors do not see your changes.
-  * Only one tab writes at a time; opening a second tab hands over the data.
-  * SMS, bank gateway and accounting (Holoo) are simulated, not connected.
+نکته‌ها
+  * پیامک، درگاه بانکی و حسابداری (هلو) شبیه‌سازی‌اند و به سرویس واقعی وصل نیستند.
+  * تغییرات هر کس حداکثر چند ثانیه بعد برای بقیه دیده می‌شود.

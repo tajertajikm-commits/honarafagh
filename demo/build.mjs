@@ -182,6 +182,8 @@ run(path.join(root, "node_modules/.bin/next"), ["build", "--webpack"], {
 });
 const out = path.join(site, "out");
 if (!existsSync(path.join(out, "index.html"))) throw new Error("export produced no index.html");
+// Shared data: a small PHP endpoint (runs on any PHP host; without PHP the demo stays per-browser).
+cpSync(path.join(root, "demo/static/demo/sync.php"), path.join(out, "demo/sync.php"));
 writeFileSync(path.join(out, "DEMO-README.txt"), readFileSync(path.join(root, "demo/static/DEMO-README.txt"), "utf8").replaceAll("{{BASE}}", BASE || "/"));
 
 // ── 4. zip ──────────────────────────────────────────────────────────────────

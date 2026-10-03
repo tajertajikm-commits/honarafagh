@@ -20,6 +20,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import * as schema from "@/server/db/schema";
 import { setStorageDriver } from "@/server/integrations/storage";
 import { DatabaseStorage, DEMO_SQL } from "../runtime/blob-storage";
+import { SYNC_SQL } from "../runtime/sync-sql";
 
 /** Migrations without pg_trgm (only used for search indexes; not bundled in the browser build). */
 export function demoMigrationSql(root: string): string {
@@ -63,6 +64,7 @@ async function main() {
   await seedDemo(db as never, ref);
   await drainOutbox(100);
   await pg.query(`INSERT INTO demo_meta (key, value) VALUES ('seeded_at', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, [new Date().toISOString()]);
+  await pg.exec(SYNC_SQL); // change capture for the shared (PHP-synced) demo — after the seed, so the seed is not a change
   await pg.exec("VACUUM FULL");
   await pg.exec("CHECKPOINT");
   const dump = await pg.dumpDataDir("gzip");

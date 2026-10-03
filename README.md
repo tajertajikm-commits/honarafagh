@@ -41,7 +41,10 @@ places an order, staff move it forward in other tabs or devices. Instructions in
 [`demo-dist/printing-house-demo.zip`](demo-dist/printing-house-demo.zip) is a self-contained demo of
 the whole platform that runs in the browser (PostgreSQL as WebAssembly, stored in
 IndexedDB). Extract it into `public_html/printing-demo/` and open `https://your-domain/printing-demo/`:
-no database, Node.js or API keys needed, but each browser keeps its own data. See [docs/static-demo.md](docs/static-demo.md).
+no database, Node.js or API keys needed. On a PHP host (any cPanel) a tiny `demo/sync.php` shares the data between
+everyone who opens the link: the client registers and orders on their phone, staff see it in the panel within
+seconds, and each browser tab has its own sign-in. Without PHP each browser keeps its own data.
+See [docs/static-demo.md](docs/static-demo.md).
 
 ## Scripts
 
