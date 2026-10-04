@@ -11,18 +11,20 @@
 - `pricing-engine.test.ts`: imposition, offset vs digital costing, operations, markup, urgency, discounts, rounding, VAT, method selection.
 - `workflow.test.ts`: station plans (required stations, normalisation), phase readiness, derived order status, quality return targets, blocked reasons.
 
-## Integration (36 tests)
+## Integration (44 tests)
 
 - `workflows.test.ts`: the full **Digital** flow (customer → Labafi approval with station plan → artwork review → every station → Labafi QC → packaging → shipping → customer stage) and the full **Offset** flow (approval → litho ‖ paper → quotes → Hamed chooses supplier → press → priority with charge → print → Hamed print QC → post-press → Hamed final QC → packaging → shipping), plus permissions (who may approve, QC, choose suppliers), partial station plans, QC rejection and rework, design requests, reject / needs-info, pricing before payment, per-process queues and customer isolation.
 - `payments-pricing.test.ts`: store checkout (server re-pricing, idempotency, a mixed cart split into one order per process), payment callbacks, transfer receipts, refunds, official/unofficial invoices with immutable snapshots, discount allocation, pricing versions.
+- `rework.test.ts`: manager-only reassignment (others lose the step), designer reassignment, undo of one's own step until the next starts, manager send-back with later steps redone, quality rejection back to design, back to the customer's file, cancelling a dispatch by sending back, adding lamination mid-job with a charge, removing an unfinished station, and who delivered the order.
 - `seed.test.ts`, `actor-resolution.test.ts`.
 
-## End-to-end (6 tests, `tests/e2e`)
+## End-to-end (8 tests, `tests/e2e`)
 
 - `workflows.spec.ts`: Digital and Offset flows through the real UI, each step logged in as the person who does it; the customer sees only the simplified stage; public tracking by code + phone; role isolation.
+- `rework.spec.ts`: reassigning, undo, adding a station mid-job, sending back to design, the customer's call button, the work report, and the person who handed over a pickup.
 - `customer.spec.ts`: store purchase (configure → cart → OTP → checkout → sandbox payment) and a mobile account check.
 
-Run against a freshly seeded database (`pnpm db:reset && pnpm db:seed`): the tests mutate data, and the OTP cooldown applies per phone.
+Run against a freshly seeded database with samples (`pnpm db:reset && pnpm db:seed:samples`): the tests mutate data, and the OTP cooldown applies per phone.
 
 Static demo: `pnpm demo:test` (see `demo/tests/playwright.config.ts`).
 

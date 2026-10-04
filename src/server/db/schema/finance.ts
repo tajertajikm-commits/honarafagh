@@ -162,6 +162,8 @@ export const shipments = pgTable(
     address: jsonb("address").$type<AddressSnapshot | null>(),
     dispatchedAt: timestamp("dispatched_at", { withTimezone: true }).notNull().defaultNow(),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    /** The staff member who handed the order to the customer (or the courier who delivered it). */
+    deliveredById: uuid("delivered_by_id").references(() => employees.id, { onDelete: "set null" }),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id),
     ...timestamps,

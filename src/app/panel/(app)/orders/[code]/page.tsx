@@ -13,15 +13,16 @@ import { KV } from "@/components/panel/page";
 import { StepActions } from "@/components/panel/step-actions";
 import { ApprovalPanel, ArtworkReview, ArtworkUpload, ChooseSupplier, DesignComplete, DispatchForm, IssueInvoice, LithoForm, PaymentForm, PriceForm, PriorityControl, QuoteForm } from "@/components/panel/order-forms";
 import { ActionButton } from "@/components/panel/actions";
+import { DeliveredForm, DesignerAssign, PlanEditor, ReturnOrder, StepAssign, type ReturnTarget } from "@/components/panel/rework-forms";
 import { employeeRoles, employees, rolePermissions, users } from "@/server/db/schema";
-import { can, type Ctx } from "@/server/core/context";
+import { actorUserId, can, type Ctx } from "@/server/core/context";
 import { requireStaffPage } from "@/server/http/session";
 import { suggestedStations } from "@/server/modules/orders/approval";
 import { staffOrder, type StaffOrder } from "@/server/modules/orders/queries";
 import { balanceOf } from "@/server/modules/orders/state";
 import { listMachines, listMaterials } from "@/server/modules/materials/service";
 import { listSuppliers } from "@/server/modules/offset/service";
-import { blockedReason } from "@/server/modules/workflow/engine";
+import { ACTIVE_STATUSES, blockedReason, RETURN_CUSTOMER_FILE, RETURN_DESIGN, RETURN_LABEL } from "@/server/modules/workflow/engine";
 import { APPROVE_PERMISSION, stationsOf } from "@/server/modules/workflow/stations";
 import { customerStatus } from "@/lib/order-status";
 import { APPROVAL_DECISION, ARTWORK_FILE_STATUS, ARTWORK_STATUS, INVOICE_TYPE, LITHO_STATUS, ORDER_KIND, ORDER_STATUS, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS, PRODUCTION_TYPE, SHIPPING_METHOD, STEP_STATUS, label } from "@/lib/labels";
@@ -96,6 +97,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {(can(ctx, "invoice.manage") || can(ctx, "payment.view") || can(ctx, "dashboard.view")) && (
+              <Link href={`/panel/order-report/${o.code}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[13px] font-bold hover:bg-surface-2">
+                <FileText className="size-4" /> برگه گزارش کار
+              </Link>
+            )}
             {can(ctx, "order.priority") && !closed && <PriorityControl orderId={o.id} isPriority={o.isPriority} />}
             {can(ctx, "order.cancel") && !closed && (
               <ReasonAction path={`orders/${o.id}/cancel`} title="لغو سفارش" success="سفارش لغو شد." variant="danger-ghost" danger confirmLabel="لغو سفارش">
@@ -256,7 +262,8 @@ function Summary({ data }: { data: StaffOrder }) {
 
 // ── Files ───────────────────────────────────────────────────────────────────
 
-function Files({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
+async function Files({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
+  const designers = can(ctx, "dashboard.view") && data.order.needsDesign ? await staffWith(ctx, ["design.work"]) : [];
   const o = data.order;
   const open = !["REJECTED", "CANCELLED", "DELIVERED"].includes(o.status);
   const designing = o.needsDesign && ["DESIGN_REQUESTED", "DESIGN_IN_PROGRESS"].includes(o.artworkStatus);
@@ -291,6 +298,7 @@ function Files({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
           <CardBody className="space-y-3">
             <Status map={ARTWORK_STATUS} value={o.artworkStatus} />
             {o.needsDesign && <KV label="طراح">{data.designerName ?? "تعیین نشده"}</KV>}
+            {designers.length > 0 && !["DELIVERED", "REJECTED", "CANCELLED"].includes(o.status) && <DesignerAssign orderId={o.id} designerId={o.designerId} designers={designers} />}
             {designing && canDesign && (
               <div className="space-y-3 rounded-xl bg-violet-soft/60 p-3">
                 {o.artworkStatus === "DESIGN_REQUESTED" && <ActionButton path={`orders/${o.id}/design/start`} success="طراحی شروع شد." size="sm" variant="secondary">شروع طراحی</ActionButton>}
@@ -319,15 +327,55 @@ async function Production({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
   const materials = can(ctx, "digital.production") && o.productionType === "DIGITAL" ? (await listMaterials(ctx, { category: ["PAPER", "CARDBOARD"] })).map((m) => ({ id: m.id, name: m.name, unit: m.unit, stock: m.stock, category: m.category })) : [];
   const machines = can(ctx, "offset.press.assign") ? await listMachines(ctx) : [];
   const phases = [...new Set(data.steps.map((s) => s.step.phase))];
+  const active = (ACTIVE_STATUSES as readonly string[]).includes(o.status);
+  const manager = can(ctx, "dashboard.view");
+  const canPlan = active && o.status !== "SHIPPING" && (manager || can(ctx, APPROVE_PERMISSION[o.productionType]));
+  const me = actorUserId(ctx);
+  // Who may be handed each station (manager only).
+  const perms = [...new Set(data.steps.map((s) => s.station.permission))];
+  const peopleBy = new Map(manager && active ? await Promise.all(perms.map(async (p) => [p, await staffWith(ctx, [p])] as const)) : []);
+  // Where work can be sent back to: a step already started/done, or the artwork.
+  const hasArtworkSteps = data.steps.some((s) => s.station.needsArtwork);
+  const artworkTargets: ReturnTarget[] = hasArtworkSteps
+    ? [
+        { key: RETURN_DESIGN, label: RETURN_LABEL[RETURN_DESIGN]!, hint: "طراحی دوباره انجام می‌شود (صف طراح) و مراحل وابسته به فایل تا تکمیل طراحی منتظر می‌مانند." },
+        { key: RETURN_CUSTOMER_FILE, label: RETURN_LABEL[RETURN_CUSTOMER_FILE]!, hint: "از مشتری فایل اصلاح‌شده خواسته می‌شود (پیامک و حساب کاربری)." },
+      ]
+    : [];
+  const doneTargets: ReturnTarget[] = data.steps
+    .filter((s) => s.step.status === "DONE" || s.step.status === "IN_PROGRESS")
+    .map((s) => ({ key: s.step.key, label: `${s.station.name} (${s.step.status === "DONE" ? "انجام شده" : "در حال انجام"})` }));
+  const planStations = stationsOf(o.productionType).map((st) => {
+    const inPlan = data.steps.find((s) => s.step.key === st.key);
+    return { key: st.key, name: st.name, phase: st.phase, required: st.required, inPlan: !!inPlan, status: inPlan?.step.status ?? null };
+  });
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title={`مسیر تولید ${PRODUCTION_TYPE[o.productionType]}`} description="هر مرحله وقتی مراحل قبلی تمام شد وارد صف ایستگاهش می‌شود." />
+        <CardHeader
+          title={`مسیر تولید ${PRODUCTION_TYPE[o.productionType]}`}
+          description="هر مرحله وقتی مراحل قبلی تمام شد وارد صف ایستگاهش می‌شود."
+          actions={
+            active && (canPlan || manager) ? (
+              <div className="flex flex-wrap gap-2">
+                {canPlan && <PlanEditor orderId={o.id} stations={planStations} />}
+                {manager && <ReturnOrder orderId={o.id} targets={[...doneTargets, ...artworkTargets]} />}
+              </div>
+            ) : undefined
+          }
+        />
         <ol className="divide-y divide-line">
           {phases.map((p) => (
             <li key={p} className={cn("grid", data.steps.filter((s) => s.step.phase === p).length > 1 && "lg:grid-cols-2 lg:divide-x lg:divide-x-reverse lg:divide-line")}>
               {data.steps.filter((s) => s.step.phase === p).map(({ step: s, station: st, machineName, assigneeName }) => {
-                const returnOptions = data.steps.filter((x) => x.step.phase < s.phase && ["WORK", "PRINT", "PAPER_SELECT"].includes(x.station.kind)).map((x) => ({ key: x.step.key, name: x.station.name }));
+                // Quality rejection: back to any earlier step, or to the design / the customer's file.
+                const returnOptions = [
+                  ...artworkTargets.map((t) => ({ key: t.key, name: t.label })),
+                  ...data.steps.filter((x) => x.step.phase < s.phase && x.station.kind !== "QUALITY" && x.step.status === "DONE").map((x) => ({ key: x.step.key, name: x.station.name })),
+                ];
+                const laterStarted = data.steps.some((x) => x.step.phase > s.phase && (x.step.status === "IN_PROGRESS" || x.step.status === "DONE"));
+                const canUndo = active && !manager && (s.status === "DONE" || s.status === "IN_PROGRESS") && (s.completedBy === me || s.startedBy === me) && can(ctx, st.permission) && !laterStarted;
+                const people = peopleBy.get(st.permission) ?? [];
                 return (
                   <div key={s.id} className={cn("flex flex-wrap items-center gap-3 px-5 py-4", s.status === "IN_PROGRESS" && "bg-accent-soft/40", s.status === "READY" && "bg-warning-soft/30")}>
                     <span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-[12px] font-bold tabular", s.status === "DONE" ? "bg-success text-white" : s.status === "IN_PROGRESS" ? "bg-accent text-white" : s.status === "READY" ? "bg-warning-soft text-warning ring-1 ring-warning/30" : "bg-surface-2 text-muted")}>
@@ -337,7 +385,7 @@ async function Production({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
                       <p className="text-[14px] font-bold">{st.name} {s.reworkCount > 0 && <Badge tone="danger" className="ms-1">دوباره‌کاری × {formatNumber(s.reworkCount)}</Badge>}</p>
                       <p className="text-[12px] text-muted">
                         {label(STEP_STATUS, s.status)}
-                        {assigneeName && ` • ${assigneeName}`}
+                        {assigneeName && ` • ${s.assignedBy ? "ارجاع به " : ""}${assigneeName}`}
                         {machineName && ` • ${machineName}`}
                         {s.completedAt && <> • <DateText value={s.completedAt} withTime /></>}
                         {s.status === "IN_PROGRESS" && s.startedAt && <> • از <DateText value={s.startedAt} relative /></>}
@@ -347,9 +395,11 @@ async function Production({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
                       {s.note && <p className="text-[12px] text-ink-2">{s.note}</p>}
                       {blockedReason(s, o) && <Badge tone="warning" className="mt-1">{blockedReason(s, o)}</Badge>}
                     </div>
+                    {manager && active && s.status !== "DONE" && people.length > 0 && <StepAssign stepId={s.id} assigneeId={s.assigneeId} assignedByManager={!!s.assignedBy} people={people} />}
+                    {canUndo && <ReturnOrder orderId={o.id} targets={[{ key: s.key, label: st.name }]} undo />}
                     <StepActions
                       step={{ id: s.id, key: s.key, name: st.name, kind: st.kind, status: s.status, machineId: s.machineId, blocked: blockedReason(s, o), orderCode: o.code }}
-                      canPerform={can(ctx, st.permission)}
+                      canPerform={can(ctx, st.permission) && (!s.assignedBy || !s.assigneeId || manager || (ctx.actor.kind === "staff" && ctx.actor.employeeId === s.assigneeId))}
                       canAssignPress={can(ctx, "offset.press.assign")}
                       materials={materials}
                       machines={machines}
@@ -565,6 +615,7 @@ async function Shipping({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
               {s.shipment.trackingCode && <KV label="کد رهگیری"><bdi dir="ltr">{s.shipment.trackingCode}</bdi></KV>}
               <KV label="ارسال"><DateText value={s.shipment.dispatchedAt} withTime /></KV>
               <KV label="تحویل">{s.shipment.deliveredAt ? <DateText value={s.shipment.deliveredAt} withTime /> : <Badge tone="info">در مسیر</Badge>}</KV>
+              {s.deliveredByName && <KV label="تحویل‌دهنده به مشتری">{s.deliveredByName}</KV>}
               {s.shipment.recipientName && <KV label="گیرنده">{s.shipment.recipientName}</KV>}
               {s.shipment.notes && <KV label="توضیح">{s.shipment.notes}</KV>}
             </div>
@@ -573,7 +624,7 @@ async function Shipping({ ctx, data }: { ctx: Ctx; data: StaffOrder }) {
           ) : (
             <p className="text-[13px] text-muted">{step ? "سفارش پس از بسته‌بندی آماده ارسال می‌شود." : "مسیر تولید هنوز تعیین نشده است."}</p>
           )}
-          {s && s.shipment.status === "DISPATCHED" && canShip && <ActionButton path={`orders/${o.id}/delivered`} success="تحویل ثبت شد." size="sm">تحویل شد</ActionButton>}
+          {s && s.shipment.status === "DISPATCHED" && canShip && <DeliveredForm orderId={o.id} people={people} defaultId={s.shipment.method === "COURIER" ? s.shipment.responsibleId : null} />}
         </CardBody>
       </Card>
       <Card>

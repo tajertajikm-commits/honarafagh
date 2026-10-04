@@ -80,6 +80,7 @@ async function Orders({ ctx, filter, q }: { ctx: Parameters<typeof accountingOrd
                 <TH className="text-end">مانده</TH>
                 <TH>پرداخت</TH>
                 <TH>فاکتور</TH>
+                <TH>گزارش کار</TH>
               </TR>
             </THead>
             <TBody>
@@ -99,6 +100,7 @@ async function Orders({ ctx, filter, q }: { ctx: Parameters<typeof accountingOrd
                   <TD className="text-end">{r.pricedAt ? <Money rial={Math.max(0, r.balance)} strong className={r.balance > 0 ? "text-danger" : ""} /> : "—"}</TD>
                   <TD>{r.pricedAt ? <Status map={PAYMENT_STATUS} value={r.paymentStatus} /> : "—"}</TD>
                   <TD>{r.invoiceCount > 0 ? <Badge tone="success">{formatNumber(r.invoiceCount)} فاکتور</Badge> : <span className="text-[12px] text-muted">—</span>}</TD>
+                  <TD><Link href={`/panel/order-report/${r.code}`} className="text-[12.5px] font-bold text-accent-ink hover:underline">PDF</Link></TD>
                 </TR>
               ))}
             </TBody>

@@ -43,13 +43,15 @@ export const productionSteps = pgTable(
     phase: integer("phase").notNull(),
     status: stepStatus("status").notNull().default("WAITING"),
     assigneeId: uuid("assignee_id").references(() => employees.id, { onDelete: "set null" }),
+    /** Set when the manager hands the step to a person: then only that person (or the manager) may do it. */
+    assignedBy: uuid("assigned_by").references(() => users.id),
     machineId: uuid("machine_id").references(() => machines.id, { onDelete: "set null" }),
     readyAt: timestamp("ready_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     startedBy: uuid("started_by").references(() => users.id),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     completedBy: uuid("completed_by").references(() => users.id),
-    /** Times this step was sent back by a quality rejection. */
+    /** Times this step was sent back (quality rejection, manager return, undo). */
     reworkCount: integer("rework_count").notNull().default(0),
     note: text("note"),
     /** Step-specific record, e.g. paper used: { materialId, quantity }. */

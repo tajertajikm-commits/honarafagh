@@ -13,6 +13,7 @@ export interface DomainEvents {
   ArtworkUploaded: { orderId: string };
   ArtworkNeedsCorrection: { orderId: string; note: string };
   DesignAssigned: { orderId: string; designerUserId: string | null };
+  StepAssigned: { orderId: string; stepKey: string; assigneeUserId: string };
   QualityCheckNeeded: { orderId: string; stepKey: string };
   PaperDecisionNeeded: { orderId: string };
   OrderReady: { orderId: string };

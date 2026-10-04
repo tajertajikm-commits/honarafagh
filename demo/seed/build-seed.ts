@@ -59,9 +59,13 @@ async function main() {
   const { seedDemo } = await import("@/server/seed/seed-demo");
   const { drainOutbox } = await import("@/server/events/worker");
   console.info("[demo-seed] reference data…");
-  const ref = await seedReference(db as never, { staffPassword: process.env.SEED_STAFF_PASSWORD ?? "honar1405" });
-  console.info("[demo-seed] demo scenario…");
-  await seedDemo(db as never, ref);
+  // Clean by default (no made-up customers, orders, suppliers or paper stock); DEMO_SAMPLES=1 adds them.
+  const samples = process.env.DEMO_SAMPLES === "1";
+  const ref = await seedReference(db as never, { staffPassword: process.env.SEED_STAFF_PASSWORD ?? "honar1405", samples });
+  if (samples) {
+    console.info("[demo-seed] sample scenario…");
+    await seedDemo(db as never, ref);
+  }
   await drainOutbox(100);
   await pg.query(`INSERT INTO demo_meta (key, value) VALUES ('seeded_at', $1) ON CONFLICT (key) DO UPDATE SET value = excluded.value`, [new Date().toISOString()]);
   await pg.exec(SYNC_SQL); // change capture for the shared (PHP-synced) demo — after the seed, so the seed is not a change

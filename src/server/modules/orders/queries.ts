@@ -11,6 +11,7 @@ import { normalizeFa, normalizePhone, toEnDigits } from "@/lib/persian";
 import { approvalsOf } from "./approval";
 import { artworkOf } from "./artwork";
 import { loadOrderByCode, loadOrder, worksOnType, type Order } from "./state";
+import { getSetting } from "@/server/modules/settings/service";
 
 // ── Lists ───────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export async function trackOrder(ctx: Ctx, rawCode: string, rawPhone: string) {
   const [o] = await ctx.db.select({ order: orders, phone: customers.phone }).from(orders).innerJoin(customers, eq(customers.id, orders.customerId)).where(eq(orders.code, code));
   if (!o || o.phone !== phone) throw notFound("سفارش");
   const events = await ctx.db.select({ message: orderEvents.message, createdAt: orderEvents.createdAt }).from(orderEvents).where(and(eq(orderEvents.orderId, o.order.id), eq(orderEvents.visibleToCustomer, true), eq(orderEvents.domain, "ORDER"))).orderBy(asc(orderEvents.createdAt));
-  return { code: o.order.code, title: o.order.title, productionType: o.order.productionType, createdAt: o.order.createdAt, status: customerStatus(o.order.status, o.order.artworkStatus), events };
+  const businessPhone = (await getSetting(ctx.db, "business")).phone || null;
+  return { code: o.order.code, title: o.order.title, productionType: o.order.productionType, createdAt: o.order.createdAt, status: customerStatus(o.order.status, o.order.artworkStatus), events, businessPhone };
 }
 

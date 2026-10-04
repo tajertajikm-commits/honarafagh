@@ -15,6 +15,13 @@
       "when": 1790943869259,
       "tag": "0001_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791150346190,
+      "tag": "0002_rework_assignment",
+      "breakpoints": true
     }
   ]
 }

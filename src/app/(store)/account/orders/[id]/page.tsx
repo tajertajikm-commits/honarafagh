@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ChevronLeft, FileText, Receipt, Truck } from "lucide-react";
+import { ChevronLeft, FileText, Phone, Receipt, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DateText, Money, OrderCode } from "@/components/ui/misc";
@@ -11,6 +11,7 @@ import { isAppError } from "@/server/core/errors";
 import { requireCustomerPage } from "@/server/http/session";
 import { customerOrder, type CustomerOrder } from "@/server/modules/orders/queries";
 import { balanceOf } from "@/server/modules/orders/state";
+import { getSetting } from "@/server/modules/settings/service";
 import { ARTWORK_FILE_STATUS, INVOICE_TYPE, PAYMENT_METHOD, PAYMENT_RECORD_STATUS, PAYMENT_STATUS, PRODUCTION_TYPE, label } from "@/lib/labels";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/persian";
@@ -35,6 +36,9 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
   const lastQuestion = [...d.events].reverse().find((e) => e.type === "INFO_REQUESTED");
   const correction = [...d.artwork].reverse().find((a) => a.artwork.status === "REJECTED");
   const canUpload = !closed && o.status !== "DELIVERED" && !o.needsDesign && ["AWAITING_FILE", "NEEDS_CORRECTION"].includes(o.artworkStatus);
+  const fileNote = correction?.artwork.reviewNote ?? [...d.events].reverse().find((e) => e.type === "FILE_CORRECTION")?.message;
+  const business = await getSetting(ctx.db, "business");
+  const tel = business.phone?.replace(/[^\d+]/g, "");
 
   return (
     <div className="space-y-5">
@@ -51,6 +55,9 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
           <div className="flex flex-col items-end gap-2">
             <Badge tone={d.status.tone === "danger" ? "danger" : d.status.tone === "success" ? "success" : d.status.tone === "warning" ? "warning" : "info"} className="h-7 px-3 text-[13px]">{d.status.label}</Badge>
             {(o.status === "WAITING_APPROVAL" || o.status === "NEEDS_INFO") && <CancelOrder orderId={o.id} />}
+            {tel && !closed && o.status !== "READY" && (
+              <a href={`tel:${tel}`} className="inline-flex items-center gap-1 text-[12.5px] font-bold text-accent-ink hover:underline"><Phone className="size-3.5" /> تماس با چاپخانه</a>
+            )}
           </div>
         </div>
         {d.status.index >= 0 && <StatusStepper index={d.status.index} className="mt-6" />}
@@ -67,8 +74,16 @@ export default async function CustomerOrderPage({ params, searchParams }: { para
       )}
       {canUpload && (
         <ActionCard title={o.artworkStatus === "NEEDS_CORRECTION" ? "فایل نیاز به اصلاح دارد" : "فایل طرح را بفرستید"} tone="warning">
-          {correction?.artwork.reviewNote && <p className="mb-3 rounded-xl bg-surface px-4 py-3 text-[14px] leading-7">{correction.artwork.reviewNote}</p>}
+          {o.artworkStatus === "NEEDS_CORRECTION" && fileNote && <p className="mb-3 rounded-xl bg-surface px-4 py-3 text-[14px] leading-7">{fileNote}</p>}
           <UploadArtwork orderId={o.id} label={o.artworkStatus === "NEEDS_CORRECTION" ? "ارسال فایل اصلاح‌شده" : "ارسال فایل"} />
+        </ActionCard>
+      )}
+      {o.status === "READY" && tel && (
+        <ActionCard title="سفارش شما آماده است" tone="info">
+          <p className="mb-3 text-[14px] leading-7 text-ink-2">برای هماهنگی تحویل یا ارسال با چاپخانه تماس بگیرید.</p>
+          <a href={`tel:${tel}`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14px] font-bold text-surface hover:opacity-90">
+            <Phone className="size-4" /> تماس با چاپخانه <bdi dir="ltr" className="tabular">{business.phone}</bdi>
+          </a>
         </ActionCard>
       )}
       {o.pricedAt && balance > 0 && !closed && (

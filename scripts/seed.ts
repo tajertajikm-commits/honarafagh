@@ -7,11 +7,13 @@ async function main() {
   // The outbox is drained explicitly below; inline dispatch would outlive the pool.
   process.env.WORKER_INLINE = "false";
   const db = getDb();
-  const withDemo = !process.argv.includes("--reference-only");
-  console.info("[seed] reference data…");
-  const ref = await seedReference(db, { staffPassword: process.env.SEED_STAFF_PASSWORD });
+  // Default: a clean installation (staff, roles, machines, store catalogue, settings) without made-up
+  // customers, orders, suppliers or paper stock. `--samples` adds them for tests and walkthroughs.
+  const withDemo = process.argv.includes("--samples");
+  console.info(`[seed] reference data${withDemo ? " + samples" : ""}…`);
+  const ref = await seedReference(db, { staffPassword: process.env.SEED_STAFF_PASSWORD, samples: withDemo });
   if (withDemo) {
-    console.info("[seed] demo orders…");
+    console.info("[seed] sample customers and orders…");
     await seedDemo(db, ref);
     await drainOutbox(50);
   }

@@ -60,7 +60,22 @@ becomes an order line). Queue order: in progress → priority (by when it was se
 
 Methods: courier, post, external carrier, customer courier, pickup. A shipment records the method,
 the responsible person or carrier, the tracking code, the recipient, notes and status.
-Pickup and customer-courier shipments count as delivered on handover.
+Pickup and customer-courier shipments count as delivered on handover. The person who handed the order to the customer is recorded: for pickup, whoever is chosen at handover; for the printing house's courier, the courier, unless someone else is named.
+
+When an order is ready the customer gets an SMS with the printing house's phone number, and their order page and the tracking page show a «تماس با چاپخانه» button.
+
+## Corrections during production
+
+- **Reassigning (manager only):** a step can be handed to a named person who holds that station's permission. From then on it is theirs: it leaves the others' «کارهای من», and only that person or the manager can do it. The person gets an in-app notification. The design can be reassigned to another designer the same way.
+- **Undo:** whoever recorded a step (finished it, approved quality …) can undo it, with a reason, as long as no later step has started. Undoing a paper selection puts the paper back in stock.
+- **Send back (manager, or a quality rejection):** the order goes back to any step already started or done, to «طراحی مجدد» (designer queue; file-dependent steps wait for the new design) or to «اصلاح فایل توسط مشتری» (the customer is notified). The target step is redone (rework + 1) and every later step is done again. Returning a dispatched order cancels the dispatch; a delivered order cannot be returned.
+- **Changing the plan (manager or approver):** stations can be added mid-job, e.g. lamination after printing, with an optional extra charge added to the order. Steps after the added station (quality, packaging …) are done again. Unfinished optional stations can be removed.
+- Every correction is recorded with who, when and why: in the order history, the audit log and the work report.
+
+## Work report (شناسنامه سفارش)
+
+`/panel/order-report/{code}` (accountant and manager) is the order's complete A4 record:
+customer and job spec, approvals with the selected stations, files and design, every station (who, when, machine, paper, rework), quality decisions, priority, offset procurement, money (lines, payments, invoices), shipping including **who handed it to the customer**, and the full history. «دانلود PDF» uses the browser's Save as PDF.
 
 ## What the customer sees
 

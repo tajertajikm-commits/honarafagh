@@ -5,6 +5,7 @@ import type { Ctx } from "@/server/core/context";
 import { smsProvider } from "@/server/integrations/sms";
 import { station } from "@/server/modules/workflow/stations";
 import { formatToman } from "@/lib/persian";
+import { getSetting } from "@/server/modules/settings/service";
 
 type OutboxRow = { id: number; type: string; payload: Record<string, unknown> };
 
@@ -20,7 +21,7 @@ async function variablesFor(ctx: Ctx, e: OutboxRow) {
   const p = e.payload as Record<string, string | number | null | undefined>;
   const vars: Record<string, string | number | null> = {};
   let customer: { id: string; phone: string; fullName: string; userId: string | null } | null = null;
-  let order: { id: string; type: "DIGITAL" | "OFFSET"; designerId: string | null } | null = null;
+  let order: { id: string; code: string; type: "DIGITAL" | "OFFSET"; designerId: string | null } | null = null;
   if (p.orderId) {
     const [o] = await ctx.db
       .select({ code: orders.code, total: orders.total, type: orders.productionType, designerId: orders.designerId, customerId: orders.customerId, phone: customers.phone, fullName: customers.fullName, userId: customers.userId })
@@ -33,7 +34,8 @@ async function variablesFor(ctx: Ctx, e: OutboxRow) {
       vars.link = `${env().APP_URL.replace(/\/+$/, "")}/account/orders/${p.orderId}`;
       if (e.type === "OrderPriced") vars.amount = formatToman(o.total);
       customer = { id: o.customerId, phone: o.phone, fullName: o.fullName, userId: o.userId };
-      order = { id: String(p.orderId), type: o.type, designerId: o.designerId };
+      order = { id: String(p.orderId), code: o.code, type: o.type, designerId: o.designerId };
+      if (e.type === "OrderReady") vars.businessPhone = (await getSetting(ctx.db, "business")).phone || "چاپخانه";
       if (e.type === "OrderShipped") {
         const [s] = await ctx.db.select({ trackingCode: shipments.trackingCode }).from(shipments).where(eq(shipments.orderId, String(p.orderId)));
         vars.trackingText = s?.trackingCode ? `کد رهگیری: ${s.trackingCode}` : "";
@@ -96,7 +98,9 @@ export async function dispatchNotifications(ctx: Ctx, e: OutboxRow) {
       let recipients = await staffWithPermission(ctx, permission);
       // Design work goes to the assigned designer when there is one.
       if (e.type === "DesignAssigned" && e.payload.designerUserId) recipients = [String(e.payload.designerUserId)];
-      const link = order ? `/panel/orders/${order.id}` : "/panel";
+      // A step the manager handed to someone goes to that person only.
+      if (e.type === "StepAssigned") recipients = e.payload.assigneeUserId ? [String(e.payload.assigneeUserId)] : [];
+      const link = order ? `/panel/orders/${order.code}` : "/panel";
       for (const userId of recipients) {
         await ctx.db
           .insert(notifications)

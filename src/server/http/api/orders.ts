@@ -7,7 +7,7 @@ import { trackOrder } from "@/server/modules/orders/queries";
 import { addSupplierQuote, decidePaperSupplier, markPaperReceived, removeSupplierQuote, saveLithoJob } from "@/server/modules/offset/service";
 import { myWork, stationQueues } from "@/server/modules/queues/service";
 import { dispatchOrder, markDelivered } from "@/server/modules/shipping/service";
-import { assignMachine, assignStep, completeStep, decideQuality, setPriority, startStep } from "@/server/modules/workflow/engine";
+import { assignDesigner, assignMachine, assignStep, completeStep, decideQuality, editPlan, returnOrder, setPriority, startStep } from "@/server/modules/workflow/engine";
 import { api } from "../router";
 import { dateLike, idempotencyKey, note, phone, positiveRial, rial, uuid } from "./schemas";
 
@@ -15,6 +15,8 @@ const text = (max: number) => z.string().trim().max(max);
 const optText = (max: number) => text(max).nullable().optional();
 const reason = text(1000).min(3);
 const stepKey = z.string().regex(/^[DO]_[A-Z_]+$/);
+/** A step of the plan, or back to design / to the customer for a corrected file. */
+const returnTarget = z.union([stepKey, z.enum(["DESIGN", "CUSTOMER_FILE"])]);
 
 export const orderRoutes = [
   // ── Customer & staff: create and follow up ──────────────────────────────
@@ -83,11 +85,18 @@ export const orderRoutes = [
   ),
   api.post(
     "steps/:id/quality",
-    { auth: "staff", body: z.object({ approve: z.boolean(), notes: optText(1000), reason: optText(1000), returnTo: stepKey.nullable().optional() }) },
+    { auth: "staff", body: z.object({ approve: z.boolean(), notes: optText(1000), reason: optText(1000), returnTo: returnTarget.nullable().optional() }) },
     async ({ ctx, params, body }) => decideQuality(ctx, params.id!, body),
   ),
   api.post("steps/:id/machine", { auth: "staff", body: z.object({ machineId: uuid }) }, async ({ ctx, params, body }) => assignMachine(ctx, params.id!, body.machineId)),
   api.post("steps/:id/assign", { auth: "staff", body: z.object({ employeeId: uuid.nullable() }) }, async ({ ctx, params, body }) => assignStep(ctx, params.id!, body.employeeId)),
+  api.post("orders/:id/return", { auth: "staff", body: z.object({ target: returnTarget, reason }) }, async ({ ctx, params, body }) => returnOrder(ctx, params.id!, body)),
+  api.post(
+    "orders/:id/plan",
+    { auth: "staff", body: z.object({ add: z.array(stepKey).max(20).optional(), remove: z.array(stepKey).max(20).optional(), reason, charge: rial.nullable().optional() }) },
+    async ({ ctx, params, body }) => editPlan(ctx, params.id!, body),
+  ),
+  api.post("orders/:id/designer", { auth: "staff", body: z.object({ employeeId: uuid }) }, async ({ ctx, params, body }) => assignDesigner(ctx, params.id!, body.employeeId)),
   api.get("queues/digital", { auth: "staff" }, async ({ ctx }) => stationQueues(ctx, "DIGITAL")),
   api.get("queues/offset", { auth: "staff" }, async ({ ctx }) => stationQueues(ctx, "OFFSET")),
   api.get("my-work", { auth: "staff" }, async ({ ctx }) => myWork(ctx)),
@@ -127,10 +136,11 @@ export const orderRoutes = [
         trackingCode: optText(80),
         recipientName: optText(120),
         recipientPhone: phone.nullable().optional(),
+        deliveredById: uuid.nullable().optional(),
         notes: optText(1000),
       }),
     },
     async ({ ctx, params, body }) => dispatchOrder(ctx, params.id!, body),
   ),
-  api.post("orders/:id/delivered", { auth: "staff", body: z.object({ recipientName: optText(120), note: optText(500) }) }, async ({ ctx, params, body }) => markDelivered(ctx, params.id!, body)),
+  api.post("orders/:id/delivered", { auth: "staff", body: z.object({ recipientName: optText(120), note: optText(500), deliveredById: uuid.nullable().optional() }) }, async ({ ctx, params, body }) => markDelivered(ctx, params.id!, body)),
 ];

@@ -14,7 +14,8 @@ See [docs/workflows.md](docs/workflows.md).
 cp .env.example .env          # defaults run in demo mode with fake providers
 pnpm install
 pnpm db:migrate               # applies drizzle/*.sql
-pnpm db:seed                  # reference data + demo orders in every state
+pnpm db:seed                  # clean start: staff, roles, machines, store catalogue (no made-up orders, suppliers or stock)
+pnpm db:seed:samples          # …or with sample customers, orders, suppliers and stock (tests, walkthroughs)
 pnpm dev                      # http://localhost:3000
 ```
 
@@ -55,7 +56,7 @@ See [docs/static-demo.md](docs/static-demo.md).
 | `pnpm typecheck` / `pnpm lint` | TypeScript strict / ESLint |
 | `pnpm test` | Unit + integration tests (Vitest, uses database `honar_test`) |
 | `pnpm test:e2e` | Playwright end-to-end tests (desktop + mobile) |
-| `pnpm db:migrate` / `db:seed` / `db:reset` | Database lifecycle (`db:seed --reference-only` skips demo orders) |
+| `pnpm db:migrate` / `db:seed` / `db:seed:samples` / `db:reset` | Database lifecycle (`db:seed` is clean; `db:seed:samples` adds sample data) |
 
 ## Documentation
 

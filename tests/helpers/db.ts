@@ -14,7 +14,7 @@ export async function resetTestDb(): Promise<ReferenceIds> {
   await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`);
   await db.execute(sql`CREATE SCHEMA public`);
   await migrate(db, { migrationsFolder: "./drizzle" });
-  return seedReference(db, { staffPassword: "test-password" });
+  return seedReference(db, { staffPassword: "test-password", samples: true });
 }
 
 export async function staffCtx(ref: ReferenceIds, code: string): Promise<Ctx> {

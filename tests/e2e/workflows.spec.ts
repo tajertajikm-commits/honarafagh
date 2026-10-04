@@ -35,6 +35,7 @@ test("digital: customer → Labafi approves → stations → Labafi QC → packa
   await page.getByRole("button", { name: "ثبت ارسال" }).click();
   await toast(page, "ارسال ثبت شد.");
   await page.getByRole("button", { name: "تحویل شد" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "ثبت تحویل" }).click();
   await toast(page, "تحویل ثبت شد.");
 
   // Customer: only the simplified stage

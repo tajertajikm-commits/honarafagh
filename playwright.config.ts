@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * E2E tests run against a seeded database (pnpm db:reset && pnpm db:seed).
+ * E2E tests run against a seeded database (pnpm db:reset && pnpm db:seed:samples).
  * Locally they reuse a running `pnpm dev`; in CI the web server is started.
  */
 export default defineConfig({

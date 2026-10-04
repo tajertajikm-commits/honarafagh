@@ -16,24 +16,31 @@ export interface ReferenceIds {
   ruleSetId: string;
 }
 
-/** Seeds configuration & master data. Run on an empty database. */
-export async function seedReference(db: Database, opts: { staffPassword?: string } = {}): Promise<ReferenceIds> {
+/**
+ * Seeds configuration & master data. Run on an empty database.
+ * The material list (paper and cardboard types with their costs) is always seeded:
+ * store pricing uses it. `samples` adds made-up suppliers and stock quantities
+ * (tests and walkthroughs); a real installation starts at zero stock and no
+ * suppliers, and enters its own.
+ */
+export async function seedReference(db: Database, opts: { staffPassword?: string; samples?: boolean } = {}): Promise<ReferenceIds> {
   await db.insert(t.appSettings).values(Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({ key, value })));
 
   const suppliers = new Map<string, string>();
-  for (const s of SUPPLIERS) {
+  for (const s of opts.samples ? SUPPLIERS : []) {
     const [row] = await db.insert(t.suppliers).values({ name: s.name, kind: s.kind, contactName: s.contactName, phone: s.phone }).returning();
     suppliers.set(s.key, row!.id);
   }
 
   const materials = new Map<string, string>();
   for (const m of MATERIALS) {
+    const stock = opts.samples ? m.onHand : 0;
     const [row] = await db
       .insert(t.materials)
-      .values({ sku: m.sku, name: m.name, category: m.category, unit: m.unit, standardCost: m.standardCost, grammage: m.paper?.grammage, sheetWidthMm: m.paper?.w, sheetHeightMm: m.paper?.h, stock: m.onHand, minStock: m.reorderPoint })
+      .values({ sku: m.sku, name: m.name, category: m.category, unit: m.unit, standardCost: m.standardCost, grammage: m.paper?.grammage, sheetWidthMm: m.paper?.w, sheetHeightMm: m.paper?.h, stock, minStock: opts.samples ? m.reorderPoint : 0 })
       .returning();
     materials.set(m.sku, row!.id);
-    await db.insert(t.stockMovements).values({ materialId: row!.id, delta: m.onHand, reason: "RECEIVE", note: "موجودی اول دوره" });
+    if (stock > 0) await db.insert(t.stockMovements).values({ materialId: row!.id, delta: stock, reason: "RECEIVE", note: "موجودی اول دوره" });
   }
 
   const [ruleSet] = await db.insert(t.pricingRuleSets).values({ code: "DEFAULT", name: "قیمت‌گذاری عمومی", description: "نرخ‌های پایه چاپخانه" }).returning();

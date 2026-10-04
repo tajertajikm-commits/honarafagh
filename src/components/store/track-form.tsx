@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import type { CustomerStatus } from "@/lib/order-status";
 import { toEnDigits } from "@/lib/persian";
 import { StatusStepper } from "./timeline";
 
-interface Result { code: string; title: string; createdAt: string; status: CustomerStatus; events: { message: string; createdAt: string }[] }
+interface Result { code: string; title: string; createdAt: string; status: CustomerStatus; events: { message: string; createdAt: string }[]; businessPhone: string | null }
 
 export function TrackForm() {
   const [code, setCode] = useState("");
@@ -52,6 +53,11 @@ export function TrackForm() {
           </div>
           {result.status.index >= 0 && <StatusStepper index={result.status.index} className="mt-6" />}
           {result.status.action && <p className="mt-4 rounded-xl bg-warning-soft px-4 py-3 text-[13.5px]">{result.status.action}</p>}
+          {result.status.stage === "READY" && result.businessPhone && (
+            <a href={`tel:${result.businessPhone.replace(/[^\d+]/g, "")}`} className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-ink px-5 text-[14px] font-bold text-surface">
+              <Phone className="size-4" /> سفارش آماده است — تماس با چاپخانه <bdi dir="ltr">{result.businessPhone}</bdi>
+            </a>
+          )}
           {result.events.length > 0 && (
             <ul className="mt-6 space-y-2 border-t border-line pt-4 text-[13px]">
               {result.events.slice(-6).reverse().map((ev, i) => (

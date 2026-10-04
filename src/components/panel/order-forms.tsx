@@ -11,10 +11,10 @@ import { cn } from "@/lib/cn";
 import { formatToman, toEnDigits } from "@/lib/persian";
 import { useApiAction } from "./actions";
 
-const tomanToRial = (v: string) => Math.round(Number(toEnDigits(v).replace(/[^\d.]/g, "") || "0") * 10);
+export const tomanToRial = (v: string) => Math.round(Number(toEnDigits(v).replace(/[^\d.]/g, "") || "0") * 10);
 const rialToToman = (rial: number | null | undefined) => (rial ? String(Math.round(rial / 10)) : "");
 
-function MoneyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function MoneyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div className="relative">
       <Input inputMode="numeric" ltr value={value} onChange={(e) => onChange(toEnDigits(e.target.value).replace(/[^\d]/g, ""))} placeholder={placeholder} className="pe-14" />
@@ -464,6 +464,7 @@ export function DispatchForm({ orderId, preferred, people }: { orderId: string; 
   const [carrierName, setCarrierName] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
   const [recipientName, setRecipientName] = useState("");
+  const [deliveredById, setDeliveredById] = useState("");
   const [notes, setNotes] = useState("");
   const METHODS = [
     ["COURIER", "پیک چاپخانه"],
@@ -503,6 +504,16 @@ export function DispatchForm({ orderId, preferred, people }: { orderId: string; 
             <Input ltr value={trackingCode} onChange={(e) => setTrackingCode(e.target.value)} />
           </Field>
         )}
+        {handover && people.length > 0 && (
+          <Field label="تحویل‌دهنده به مشتری">
+            <Select value={deliveredById} onChange={(e) => setDeliveredById(e.target.value)}>
+              <option value="">خودم</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label={handover ? "تحویل‌گیرنده" : "گیرنده"} hint="اختیاری">
           <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
         </Field>
@@ -514,7 +525,7 @@ export function DispatchForm({ orderId, preferred, people }: { orderId: string; 
         loading={pending}
         onClick={() =>
           run(
-            () => api(`orders/${orderId}/dispatch`, { body: { method, responsibleId: responsibleId || null, carrierName: carrierName || null, trackingCode: trackingCode || null, recipientName: recipientName || null, notes: notes || null } }),
+            () => api(`orders/${orderId}/dispatch`, { body: { method, responsibleId: responsibleId || null, carrierName: carrierName || null, trackingCode: trackingCode || null, recipientName: recipientName || null, deliveredById: handover ? deliveredById || null : null, notes: notes || null } }),
             handover ? "تحویل ثبت شد." : "ارسال ثبت شد.",
           )
         }

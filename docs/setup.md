@@ -10,18 +10,18 @@ createdb -O honar honar_test # for the test suite
 cp .env.example .env
 pnpm install
 pnpm db:migrate
-pnpm db:seed                 # --reference-only for an empty business
+pnpm db:seed                 # clean start; db:seed:samples adds sample data
 pnpm dev
 ```
 
 `pnpm db:reset` drops and re-migrates the database named in `DATABASE_URL`. It
 refuses to run with `NODE_ENV=production` unless `--force` is passed.
 
-The seed creates reference data (5 machines incl. 1-, 4- and 8-colour presses, materials and
-stock, paper and lithography suppliers, store products with options, a published pricing
-version, 7 roles and the 7 staff members, shipping methods, notification templates, seller and
-invoice settings) and a demo scenario: 6 customers and about 23 orders covering every stage of
-both the Digital and Offset flows, built through the real services.
+The seed creates reference data: 5 machines (including 1-, 4- and 8-colour presses), the material
+list at zero stock (store pricing uses it), store products with options, a published pricing version,
+7 roles and the 7 staff members, shipping methods, notification templates, and seller and invoice
+settings. There are no customers, orders, suppliers or stock. `pnpm db:seed:samples` adds sample
+suppliers, stock, 6 customers and about 23 orders covering every stage of both flows.
 
 ## Single-server mode (embedded database)
 
@@ -41,7 +41,7 @@ package (`demo-dist/honarafagh-server.zip`).
    pnpm install --frozen-lockfile
    pnpm build
    pnpm db:migrate
-   pnpm db:seed --reference-only   # first install only
+   pnpm db:seed                    # first install only (clean, no sample data)
    ```
 4. Run two processes (systemd, PM2, or two containers from the same image):
    ```bash

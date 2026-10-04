@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { customers, employees, lithographyJobs, machines, orders, payments, procurementDecisions, productionSteps, supplierQuotes, users } from "@/server/db/schema";
 import { type Ctx, assertCanAny, can } from "@/server/core/context";
 import { worksOnType } from "@/server/modules/orders/state";
@@ -30,6 +31,9 @@ export interface QueueItem {
   machineName: string | null;
   machineCategory: string | null;
   assigneeName: string | null;
+  assigneeId: string | null;
+  /** The manager handed this step to `assigneeId`: it is theirs. */
+  assignedByManager: boolean;
   order: QueueOrder;
   /** Why it cannot start yet. */
   blocked: string | null;
@@ -101,6 +105,8 @@ async function loadItems(ctx: Ctx, where: { type?: ProductionType; keys?: string
       machineName: r.machineName,
       machineCategory: r.machineCategory,
       assigneeName: r.assigneeName,
+      assigneeId: r.step.assigneeId,
+      assignedByManager: !!r.step.assignedBy,
       order: { ...r.order, customerName: r.customerName },
       blocked: blockedReason(r.step, r.order),
       detail: r.step.key === "O_PAPER" ? (details.paper.get(r.order.id) ?? "در انتظار استعلام قیمت") : r.step.key === "O_LITHO" ? (details.litho.get(r.order.id) ?? LITHO_LABEL.NOT_ORDERED) : null,
@@ -232,7 +238,10 @@ export async function myWork(ctx: Ctx): Promise<MyWork> {
 
   // Station work the user is allowed to perform.
   const allowed = ["DIGITAL", "OFFSET"].flatMap((t) => stationsOf(t as ProductionType)).filter((s) => can(ctx, s.permission));
-  const live = allowed.length ? await loadItems(ctx, { keys: allowed.map((s) => s.key), statuses: ["READY", "IN_PROGRESS"] }) : [];
+  const me = ctx.actor.kind === "staff" ? ctx.actor.employeeId : null;
+  const live = (allowed.length ? await loadItems(ctx, { keys: allowed.map((s) => s.key), statuses: ["READY", "IN_PROGRESS"] }) : []).filter(
+    (i) => !i.assignedByManager || i.assigneeId === me, // handed by the manager to someone else: not mine
+  );
   const stations = allowed.map((st) => ({ station: st, items: live.filter((i) => i.key === st.key) })).filter((g) => g.items.length > 0);
 
   let pressAssignment: QueueItem[] = [];
@@ -269,13 +278,16 @@ export async function myWork(ctx: Ctx): Promise<MyWork> {
 }
 
 /** Steps of one order with display data (order page). */
+const completer = alias(users, "completer");
+
 export async function orderSteps(ctx: Ctx, orderId: string) {
   const rows = await ctx.db
-    .select({ step: productionSteps, machineName: machines.name, assigneeName: users.fullName })
+    .select({ step: productionSteps, machineName: machines.name, assigneeName: users.fullName, completedByName: completer.fullName })
     .from(productionSteps)
     .leftJoin(machines, eq(machines.id, productionSteps.machineId))
     .leftJoin(employees, eq(employees.id, productionSteps.assigneeId))
     .leftJoin(users, eq(users.id, employees.userId))
+    .leftJoin(completer, eq(completer.id, productionSteps.completedBy))
     .where(eq(productionSteps.orderId, orderId))
     .orderBy(asc(productionSteps.phase), asc(productionSteps.key));
   return rows.map((r) => ({ ...r, station: station(r.step.key) }));
