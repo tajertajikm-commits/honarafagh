@@ -17,8 +17,8 @@ import { DEMO_STAFF_PASSWORD } from "@/server/seed/reference";
 import { api, ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 import { formatPhone, toFaDigits } from "@/lib/persian";
-import { type BootStage, demoReady, onBootStage, resetDemo } from "./boot";
-import { isShared } from "./sync";
+import { type BootStage, demoReady, onBootStage, resetDemo, resetLocalOnly } from "./boot";
+import { hasSharedBackup, isShared, onUnsaved, restoreShared, unsavedCount } from "./sync";
 import { BASE_PATH, readCookie } from "./cookies";
 import { installInterceptors } from "./interceptors";
 import { demoRefresh } from "./refresh";
@@ -77,8 +77,9 @@ function BootOverlay({ stage, detail }: { stage: BootStage; detail?: string }) {
           <>
             <p className="mt-2 text-[17px] font-bold">راه‌اندازی دمو ممکن نشد</p>
             <p className="mt-2 break-words text-[12.5px] text-muted" dir="auto">{detail}</p>
-            <p className="mt-2 text-[12.5px] leading-6 text-muted">مرورگر باید IndexedDB و WebAssembly را پشتیبانی کند (Chrome، Edge، Firefox یا Safari به‌روز؛ حالت خصوصی برخی مرورگرها پشتیبانی نمی‌کند).</p>
-            <button className="mt-5 h-11 rounded-lg bg-ink px-5 text-[14px] font-bold text-surface" onClick={() => void resetDemo()}>بازنشانی و تلاش دوباره</button>
+            <p className="mt-2 text-[12.5px] leading-6 text-muted">داده‌های مشترک روی سرور محفوظ است و با «تلاش دوباره» برمی‌گردد.</p>
+            <button className="mt-5 h-11 rounded-lg bg-ink px-5 text-[14px] font-bold text-surface" onClick={() => window.location.reload()}>تلاش دوباره</button>
+            <button className="mt-3 block w-full text-[12px] text-muted underline" onClick={() => void resetLocalOnly()}>پاک کردن حافظه همین مرورگر و تلاش دوباره</button>
           </>
         ) : (
           <>
@@ -100,6 +101,25 @@ function DemoPanel() {
   const [who, setWho] = useState<{ staff: string | null; customer: string | null }>({ staff: null, customer: null });
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [backup, setBackup] = useState(false);
+  // Shown only when saving to the server lags (network trouble), not on every save.
+  const [unsavedShown, setUnsavedShown] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const update = (n: number) => {
+      if (timer) clearTimeout(timer);
+      if (n === 0) setUnsavedShown(false);
+      else timer = setTimeout(() => setUnsavedShown(unsavedCount() > 0), 2500);
+    };
+    const off = onUnsaved(update);
+    return () => {
+      off();
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+  useEffect(() => {
+    if (open && isShared()) void hasSharedBackup().then(setBackup);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -179,6 +199,11 @@ function DemoPanel() {
 
   return (
     <div className="no-print">
+      {unsavedShown && (
+        <div className="fixed bottom-16 left-4 z-[90] rounded-full border border-danger/30 bg-danger-soft px-4 py-2 text-[12.5px] font-bold text-danger shadow-float" role="status">
+          ارتباط با سرور کند است؛ تغییرات در حال ذخیره است… صفحه را نبندید.
+        </div>
+      )}
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-4 left-4 z-[90] flex h-10 items-center gap-2 rounded-full border border-warning/40 bg-warning-soft px-4 text-[12.5px] font-bold text-warning shadow-float hover:brightness-105"
@@ -264,11 +289,27 @@ function DemoPanel() {
                 <button
                   className="flex h-9 items-center gap-1.5 rounded-lg bg-danger px-3 font-bold text-white hover:brightness-110"
                   onClick={() => {
-                    if (window.confirm(isShared() ? "همه داده‌های دمو برای همه کاربران (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟" : "همه داده‌های این دمو (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟")) void resetDemo();
+                    if (window.confirm(isShared() ? "همه داده‌های دمو برای همه کاربران (سفارش‌ها، مشتریان جدید، تغییرات) پاک شود؟ یک نسخه پشتیبان روی سرور می‌ماند و با «بازگرداندن داده‌های قبل از بازنشانی» برمی‌گردد." : "همه داده‌های این دمو (سفارش‌ها، مشتریان جدید، تغییرات) پاک و داده‌های نمونه اولیه بازگردانده شود؟")) void resetDemo();
                   }}
                 >
                   <RotateCcw className="size-4" /> بازنشانی دمو
                 </button>
+                {backup && (
+                  <button
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 font-bold hover:bg-surface-2"
+                    onClick={async () => {
+                      if (!window.confirm("داده‌های قبل از آخرین بازنشانی برای همه برگردانده شود؟ (داده‌های فعلی هم نگه داشته می‌شود و می‌توان دوباره برگشت.)")) return;
+                      try {
+                        await restoreShared();
+                        window.location.assign(new URL(`${BASE_PATH}/`, window.location.origin)); // full reload: rebuild from the restored data
+                      } catch (e) {
+                        setMsg(e instanceof Error ? e.message : "بازگردانی انجام نشد.");
+                      }
+                    }}
+                  >
+                    <RotateCcw className="size-4" /> بازگرداندن داده‌های قبل از بازنشانی
+                  </button>
+                )}
               </div>
             </div>
           </div>

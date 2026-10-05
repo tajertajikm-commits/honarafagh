@@ -232,6 +232,23 @@ async function dropDatabases() {
   );
 }
 
+/**
+ * Error screen: clear only this browser's copy and reload. Never touches the
+ * shared data on the server (in shared mode the server log is the truth and
+ * the tab simply rebuilds from it).
+ */
+export async function resetLocalOnly() {
+  if (pg) await pg.close().catch(() => {});
+  pg = null;
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("honar-demo") && k !== "honar-demo:shared-seen") localStorage.removeItem(k);
+  } catch {
+    /* ignore */
+  }
+  await dropDatabases();
+  window.location.reload();
+}
+
 /** "Reset demo": wipe browser data and reload into a fresh copy of the snapshot. */
 export async function resetDemo() {
   if (isShared()) {

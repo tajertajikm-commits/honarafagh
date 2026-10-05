@@ -11,6 +11,8 @@
  *   GET  sync.php?since=N                       → {"epoch","head","batches":[{"v","b"}…]}
  *   POST sync.php?action=push&epoch=E&base=N    → {"v"} | 409 when someone else wrote first
  *   POST sync.php?action=reset                  → back to the original demo data for everyone
+ *                                                 (the previous data is kept as a backup)
+ *   POST sync.php?action=restore                → swap back to the data before the last reset
  */
 declare(strict_types=1);
 
@@ -34,6 +36,8 @@ if (!file_exists("$dir/index.html")) @file_put_contents("$dir/index.html", '');
 const GUARD = "<?php http_response_code(404); exit; ?>\n";
 $stateFile = "$dir/state.php";
 $logFile = "$dir/log.php";
+$backupState = "$dir/backup-state.php";
+$backupLog = "$dir/backup-log.php";
 
 $lockFile = fopen("$dir/lock.php", 'c');
 if ($lockFile === false) fail(500, 'cannot open lock');
@@ -86,8 +90,9 @@ if ($method === 'GET') {
             fclose($fh);
         }
     }
+    $backup = file_exists($backupState) ? 'true' : 'false';
     flock($lockFile, LOCK_UN);
-    echo '{"epoch":' . $state['epoch'] . ',"head":' . $state['head'] . ',"batches":[' . implode(',', $lines) . ']}';
+    echo '{"epoch":' . $state['epoch'] . ',"head":' . $state['head'] . ',"backup":' . $backup . ',"batches":[' . implode(',', $lines) . ']}';
     exit;
 }
 
@@ -95,9 +100,36 @@ if ($method !== 'POST') fail(405, 'method not allowed');
 
 if ($action === 'reset') {
     flock($lockFile, LOCK_EX);
+    $old = readState($stateFile, $logFile);
+    // Keep what was there: a reset pressed by mistake can be undone (action=restore).
+    if ($old['head'] > 0) {
+        copy($stateFile, $backupState);
+        copy($logFile, $backupLog);
+    }
     $state = ['epoch' => (int) round(microtime(true) * 1000), 'head' => 0];
     file_put_contents($logFile, GUARD);
     writeState($stateFile, $state);
+    flock($lockFile, LOCK_UN);
+    echo json_encode($state);
+    exit;
+}
+
+if ($action === 'restore') {
+    flock($lockFile, LOCK_EX);
+    if (!file_exists($backupState) || !file_exists($backupLog)) {
+        flock($lockFile, LOCK_UN);
+        fail(404, 'no backup');
+    }
+    // Swap current and backup, so a restore can itself be undone.
+    $tmpState = "$dir/swap-state.php";
+    $tmpLog = "$dir/swap-log.php";
+    copy($stateFile, $tmpState);
+    copy($logFile, $tmpLog);
+    copy($backupState, $stateFile);
+    copy($backupLog, $logFile);
+    rename($tmpState, $backupState);
+    rename($tmpLog, $backupLog);
+    $state = readState($stateFile, $logFile);
     flock($lockFile, LOCK_UN);
     echo json_encode($state);
     exit;

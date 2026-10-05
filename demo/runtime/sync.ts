@@ -11,7 +11,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { BASE_PATH } from "./cookies";
 import { enqueue } from "./queue";
 
-export interface RemoteState { epoch: number; head: number }
+export interface RemoteState { epoch: number; head: number; backup?: boolean }
 interface Batch { v: number; b: { c: [string, string, string | null, string | null][]; s?: [string, string][] } }
 
 const endpoint = () => `${BASE_PATH}/demo/sync.php`;
@@ -42,15 +42,60 @@ async function getJson<T>(url: string, init?: RequestInit, timeoutMs = 8000): Pr
   }
 }
 
-/** Is the shared endpoint there (a PHP host)? */
-export async function probeShared(): Promise<RemoteState | null> {
+const SEEN_KEY = "honar-demo:shared-seen";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function probeOnce(): Promise<RemoteState | null> {
   try {
-    const r = await getJson<RemoteState>(`${endpoint()}?since=999999999`, undefined, 6000);
+    const r = await getJson<RemoteState>(`${endpoint()}?since=999999999`, undefined, 8000);
     if (r.status === 200 && r.body && typeof r.body.epoch === "number" && typeof r.body.head === "number") return r.body;
   } catch {
     /* no PHP / offline */
   }
   return null;
+}
+
+/**
+ * Is the shared endpoint there (a PHP host)? Once this browser has seen the
+ * shared demo, a failed probe is a network problem, not a host without PHP:
+ * retry, and never quietly fall back to per-browser data (that would look
+ * like the whole project disappeared).
+ */
+export async function probeShared(): Promise<RemoteState | null> {
+  let seen = false;
+  try {
+    seen = localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    /* ignore */
+  }
+  for (let attempt = 0; attempt < (seen ? 4 : 2); attempt++) {
+    if (attempt > 0) await sleep(1500 * attempt);
+    const r = await probeOnce();
+    if (r) {
+      try {
+        localStorage.setItem(SEEN_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+      return r;
+    }
+  }
+  if (seen) throw new Error("ارتباط با سرور دمو برقرار نشد. اینترنت را بررسی کنید و «تلاش دوباره» را بزنید؛ داده‌ها روی سرور محفوظ است.");
+  return null;
+}
+
+/** Changes made in this tab that the server has not confirmed yet. */
+let unsaved = 0;
+const unsavedListeners = new Set<(n: number) => void>();
+export const unsavedCount = () => unsaved;
+export function onUnsaved(l: (n: number) => void) {
+  unsavedListeners.add(l);
+  return () => unsavedListeners.delete(l);
+}
+function setUnsaved(n: number) {
+  if (n === unsaved) return;
+  unsaved = n;
+  for (const l of unsavedListeners) l(n);
 }
 
 async function applyBatches(batches: Batch[]) {
@@ -89,6 +134,7 @@ async function push(): Promise<boolean> {
   let pulled = false;
   for (let attempt = 0; attempt < 4; attempt++) {
     const rows = (await db!.query<{ id: string; tbl: string; op: string; o: string | null; n: string | null }>("SELECT id::text AS id, tbl, op, old::text AS o, new::text AS n FROM demo_changes ORDER BY id")).rows;
+    setUnsaved(rows.length);
     if (!rows.length) return pulled;
     const seqs = (await db!.query<{ n: string; v: string }>("SELECT sequencename AS n, last_value::text AS v FROM pg_sequences WHERE schemaname = 'public' AND last_value IS NOT NULL AND sequencename <> 'demo_changes_id_seq'")).rows;
     const body = JSON.stringify({ c: rows.map((r) => [r.tbl, r.op, r.o, r.n]), s: seqs.map((s) => [s.n, s.v]) });
@@ -96,6 +142,8 @@ async function push(): Promise<boolean> {
     if (r.status === 200 && r.body?.v) {
       await db!.query("DELETE FROM demo_changes WHERE id <= $1::bigint", [rows[rows.length - 1]!.id]);
       version = r.body.v;
+      const left = await db!.query<{ n: number }>("SELECT count(*)::int AS n FROM demo_changes");
+      setUnsaved(left.rows[0]?.n ?? 0);
       return pulled;
     }
     if (r.status === 409 && r.body?.error === "reset") {
@@ -120,9 +168,15 @@ export async function startShared(opts: { db: PGlite; remote: RemoteState; onRes
   version = 0;
   onReset = opts.onReset;
   onChange = opts.onChange;
-  shared = true;
   await pull();
   await opts.db.exec("DELETE FROM demo_changes"); // anything written while loading is not a user change
+  shared = true; // only now: a failed boot must never be treated as a shared session (e.g. by "reset")
+  window.addEventListener("beforeunload", (e) => {
+    if (unsaved > 0) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
   const tick = () =>
     enqueue(async () => {
       const a = await pull().catch(() => false);
@@ -130,6 +184,8 @@ export async function startShared(opts: { db: PGlite; remote: RemoteState; onRes
       return a || b;
     }).then((changed) => changed && onChange());
   setInterval(() => void tick(), 3000);
+  // Unsaved changes (the network dropped): try again sooner.
+  setInterval(() => unsaved > 0 && void tick(), 1000);
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && void tick());
 }
 
@@ -140,10 +196,32 @@ export async function beforeWrite() {
 
 /** …and share it right away. */
 export async function afterWrite() {
-  if (shared) await push().catch((err) => console.warn("[demo sync]", err));
+  if (!shared) return;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await push();
+      if (unsaved === 0) return;
+    } catch (err) {
+      console.warn("[demo sync]", err);
+    }
+    await sleep(700 * (attempt + 1));
+  }
 }
 
-/** "Reset demo" for everyone. */
+/** "Reset demo" for everyone (the server keeps the previous data as a backup). */
 export async function resetShared() {
-  await getJson(`${endpoint()}?action=reset`, { method: "POST" });
+  const r = await getJson(`${endpoint()}?action=reset`, { method: "POST" });
+  if (r.status !== 200) throw new Error("بازنشانی انجام نشد.");
+}
+
+/** Swap back to the data before the last reset. */
+export async function restoreShared() {
+  const r = await getJson(`${endpoint()}?action=restore`, { method: "POST" });
+  if (r.status !== 200) throw new Error("نسخه پشتیبانی برای بازگردانی نیست.");
+}
+
+/** Does the server hold data from before the last reset? */
+export async function hasSharedBackup(): Promise<boolean> {
+  const r = await probeOnce();
+  return !!r?.backup;
 }
