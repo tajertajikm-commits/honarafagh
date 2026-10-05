@@ -88,6 +88,22 @@ async function claimTab() {
   if (waiting > 0) await Promise.race([released, new Promise((r) => setTimeout(r, 4000))]);
 }
 
+/**
+ * The seed snapshot, addressed by build version: a browser (or host cache)
+ * that still holds the previous demo's snapshot can never serve it for this one.
+ */
+async function fetchSeed(): Promise<Response> {
+  const url = `${BASE_PATH}/demo/seed.tgz?v=${encodeURIComponent(VERSION)}`;
+  const res = await fetch(url, { cache: "force-cache" });
+  return res.ok ? res : fetch(url, { cache: "reload" });
+}
+
+/** A snapshot from an older demo build lacks the sync tables: fetch it again, bypassing caches. */
+async function isCurrentSeed(db: PGlite) {
+  const r = await db.query<{ t: string | null }>(`SELECT to_regclass('public.demo_changes')::text AS t`);
+  return !!r.rows[0]?.t;
+}
+
 async function init() {
   // A PHP host serves demo/sync.php: everyone who opens the link shares the same data.
   const remote = await probeShared();
@@ -99,7 +115,7 @@ async function init() {
   if (!isSeeded()) {
     setStage("download");
     await dropDatabases();
-    const res = await fetch(`${BASE_PATH}/demo/seed.tgz`, { cache: "force-cache" });
+    const res = await fetchSeed();
     if (!res.ok) throw new Error(`seed snapshot not found (${res.status})`);
     const blob = await res.blob();
     setStage("prepare");
@@ -123,11 +139,17 @@ async function init() {
 async function initShared(remote: RemoteState) {
   const [{ PGlite }, { drizzle }, schema] = await Promise.all([import("@electric-sql/pglite"), import("drizzle-orm/pglite"), import("@/server/db/schema")]);
   setStage("download");
-  const res = await fetch(`${BASE_PATH}/demo/seed.tgz`, { cache: "force-cache" });
+  const res = await fetchSeed();
   if (!res.ok) throw new Error(`seed snapshot not found (${res.status})`);
   const blob = await res.blob();
   setStage("prepare");
   pg = await PGlite.create({ loadDataDir: blob });
+  if (!(await isCurrentSeed(pg))) {
+    await pg.close();
+    const fresh = await fetch(`${BASE_PATH}/demo/seed.tgz?v=${encodeURIComponent(VERSION)}&r=${Date.now()}`, { cache: "reload" });
+    pg = await PGlite.create({ loadDataDir: await fresh.blob() });
+    if (!(await isCurrentSeed(pg))) throw new Error("فایل‌های دمو روی هاست قدیمی است؛ zip جدید را دوباره Extract کنید.");
+  }
   await shiftSeedTo(pg, remote.epoch); // same shift in every tab: identical starting data everywhere
   (globalThis as { __honarDb?: unknown }).__honarDb = drizzle({ client: pg, schema, casing: "snake_case" });
   await startShared({
